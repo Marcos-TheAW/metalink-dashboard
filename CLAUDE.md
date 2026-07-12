@@ -98,6 +98,13 @@ them with `curl` requires a matching `Origin` header (real browsers send this au
 `cliente_id` is always a closed `<select>` populated server-side from the `clientes` table (via
 `FormSelect.astro`) — never a free-text input, to avoid duplicate client names with different spelling.
 
+**Exception:** `src/pages/admin/importar.astro` (bulk `.xlsx` upload) handles its own POST directly in
+frontmatter instead of going through `src/pages/api/`. It's a deliberate exception, not drift — a bulk
+import needs to render a rich per-row result summary (counts + a table of skipped rows with reasons),
+which doesn't fit the redirect-with-`?erro=` pattern. The actual parsing/insert logic still lives in a
+dedicated module (`src/lib/importacao.ts`), not inlined in the page, so it stays testable/reusable the
+same way `db.ts` functions are.
+
 ### Closed enums live in `src/lib/types.ts`, not scattered across pages
 
 `canal`, `status` (pedidos), `canal`/`tipo`/`resultado` (ações comerciais) are CHECK-constrained in SQL
@@ -125,17 +132,20 @@ using the `xlsx` (SheetJS) package with `XLSX.utils.aoa_to_sheet` — headers an
 **spreadsheet's** historical names (e.g. "Canal de Origem", "Status do Pedido"), not the DB's snake_case
 enum keys; values pass through `labelFor()` to convert back to human labels. The "Semana (segunda)"
 column is reconstructed from `data_pedido`/`data_acao` at export time (`segundaFeiraDaSemana()`) — it is
-never stored. `scripts/importar-planilha.ts` is the inverse: it reads CSVs with those same original
-headers, reverse-maps labels back to enum values via the same `CANAIS`/`STATUS_PEDIDO`/etc. arrays, and
-shells out to `wrangler d1 execute --file=<generated .sql>` (it can't use `cloudflare:workers`/D1
-bindings directly since it runs as a plain Bun script outside the Workers runtime). Money is `R$`
-strings/numbers at the spreadsheet boundary but always integer centavos inside the DB and app code —
-convert at the edges (`parseValorReais`, `centavosParaReais`), never carry floats through business
-logic.
+never stored. There are two importers, both reverse-mapping labels back to enum values via the same
+`CANAIS`/`STATUS_PEDIDO`/etc. arrays: `/admin/importar` (in-app, admin-only, accepts the original
+`.xlsx` directly — parsing/upsert logic lives in `src/lib/importacao.ts`, which has D1 access via
+`cloudflare:workers` like the rest of the app) and `scripts/importar-planilha.ts` (CLI, CSV-only, shells
+out to `wrangler d1 execute --file=<generated .sql>` since a plain Bun script outside the Workers
+runtime has no `cloudflare:workers` binding access). Prefer pointing people at `/admin/importar` — it's
+the lower-friction path; the CLI script mainly exists for scripted/CI use. Money is `R$` strings/numbers
+at the spreadsheet boundary but always integer centavos inside the DB and app code — convert at the
+edges (`parseValorReais`, `centavosParaReais`), never carry floats through business logic.
 
-### D1 config placeholder
+### D1 is already provisioned
 
-`wrangler.jsonc`'s `d1_databases[0].database_id` is the literal string `REPLACE_WITH_D1_DATABASE_ID`
-until someone runs `wrangler d1 create metalink-dashboard-db` and fills in the real id — local dev
-works fine with the placeholder (wrangler resolves local D1 by name), but `wrangler deploy`/`--remote`
-commands need the real id first.
+`wrangler.jsonc`'s `d1_databases[0].database_id` points at the real production D1 database
+(`metalink-dashboard-db`) — this isn't a template placeholder anymore. If you ever see the literal
+string `REPLACE_WITH_D1_DATABASE_ID` there instead, it means you're on a fresh clone/branch that hasn't
+had the real id filled in yet; `--local` commands work fine regardless (wrangler resolves local D1 by
+name), but `wrangler deploy`/`--remote` commands need the real id first.
