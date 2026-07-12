@@ -10,11 +10,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (ROTAS_PUBLICAS.includes(pathname) || pathname.startsWith('/_')) {
     response = await next();
   } else {
-    const usuario = await resolveUsuario(context.request);
+    const resolucao = await resolveUsuario(context.request);
 
-    if (!usuario) {
-      response = context.redirect('/sem-acesso');
+    if (!resolucao.ok) {
+      response = context.redirect(`/sem-acesso?motivo=${resolucao.motivo}`);
     } else {
+      const { usuario } = resolucao;
       context.locals.usuario = usuario;
 
       if ((pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) && usuario.papel !== 'admin') {
