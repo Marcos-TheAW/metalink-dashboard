@@ -90,8 +90,10 @@ export async function processarImportacaoXlsx(
   ].filter((x): x is string => x !== null);
 
   if (planilhasEncontradas.length === 0) {
+    const nomesNoArquivo = workbook.SheetNames.map((n) => `"${n}"`).join(', ');
     throw new Error(
-      'Nenhuma aba reconhecida no arquivo. Espero abas chamadas "Clientes", "Pedidos" e/ou "Ações Comerciais".'
+      `Nenhuma aba reconhecida. Espero abas chamadas "Clientes", "Pedidos" e/ou "Ações Comerciais" ` +
+        `(sem diferenciar maiúsculas/minúsculas). O arquivo enviado tem estas abas: ${nomesNoArquivo}.`
     );
   }
 
