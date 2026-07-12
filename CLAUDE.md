@@ -1,22 +1,141 @@
-## Development
+# CLAUDE.md
 
-When starting the dev server, use background mode:
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## What this is
+
+Internal dashboard for metalinkbuilding.com.br (link building agency) that replaces a Google Sheets
+workbook ("Controle Operacional — Vendas e Relacionamento.xlsx"). Tracks pedidos (orders), ações
+comerciais (sales/outreach actions) and clientes (clients), and derives relationship/revenue metrics
+from that raw data. Deploys to Cloudflare Workers at dashboard.metalinkbuilding.com.br.
+
+Stack: Astro 7 (SSR) + `@astrojs/cloudflare` adapter, Cloudflare D1 (SQLite), Tailwind CSS v4, Bun as
+local runtime/package manager. No client-side JS framework — pages are server-rendered HTML with plain
+`<form>` POSTs; no build step beyond the standard Astro/Bun toolchain.
+
+## Commands
+
+```sh
+bun install                    # install deps
+bun run dev                    # dev server (backgrounds itself; see below)
+bun run build                  # astro build -> dist/
+bunx astro-check                # typecheck .astro + .ts files (astro-check, not tsc directly)
+bun run db:migrate:local       # apply migrations/0001_init.sql to local D1 (wrangler --local)
+bun run db:migrate:remote      # apply migrations/0001_init.sql to the real D1 database
+bun run generate-types         # regenerate worker-configuration.d.ts from wrangler.jsonc bindings
+bun run deploy                 # astro build && wrangler deploy
+bun run import:planilha        # scripts/importar-planilha.ts — see header of that file for flags
 ```
-astro dev --background
-```
 
-Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
+Migration files run in filename order; `0002_views.sql` must be applied after `0001_init.sql` (apply it
+the same way, `wrangler d1 execute metalink-dashboard-db --local --file=./migrations/0002_views.sql`,
+swapping `--local`/`--remote` as needed — there's no combined npm script for it yet).
 
-## Documentation
+`astro dev` in this Astro version detaches into a background daemon and the foreground command returns
+immediately once it's up; control it with `bun run astro -- dev stop` / `dev status` / `dev logs` rather
+than expecting `bun run dev` to block.
 
-Full documentation: https://docs.astro.build
+**Windows/Bun note:** `astro add <integration>` fails under Bun's runtime (`node:module registerHooks`
+is not implemented by Bun yet) — run integration-add commands with real Node instead:
+`node node_modules/astro/bin/astro.mjs add <integration>`. Everyday commands (`dev`, `build`,
+`astro-check`, `wrangler`) run fine under Bun.
 
-Consult these guides before working on related tasks:
+## Architecture
 
-- [Adding pages, dynamic routes, or middleware](https://docs.astro.build/en/guides/routing/)
-- [Working with Astro components](https://docs.astro.build/en/basics/astro-components/)
-- [Using React, Vue, Svelte, or other framework components](https://docs.astro.build/en/guides/framework-components/)
-- [Adding or managing content](https://docs.astro.build/en/guides/content-collections/)
-- [Adding styles or using Tailwind](https://docs.astro.build/en/guides/styling/)
-- [Supporting multiple languages](https://docs.astro.build/en/guides/internationalization/)
+### Env bindings: no `Astro.locals.runtime`
+
+This project uses `@astrojs/cloudflare` v14 (Astro 6+ era adapter). The old `Astro.locals.runtime.env`
+API was removed. **Bindings are accessed via `import { env } from 'cloudflare:workers'`**, both in
+Workers production and in `astro dev` (the Cloudflare Vite plugin proxies it). `src/lib/db.ts` is the
+only place that should import `cloudflare:workers` directly — everything else goes through its exported
+functions. The `Env` type (currently `{ DB: D1Database; ASSETS: Fetcher }`) is generated into
+`worker-configuration.d.ts` by `wrangler types` / the build process; that file is gitignored and
+regenerated automatically, don't hand-edit it.
+
+### Auth: Cloudflare Access, no local login
+
+There is no username/password. `src/middleware.ts` reads the `Cf-Access-Authenticated-User-Email`
+header (injected by Cloudflare Access at the edge) via `src/lib/auth.ts#resolveUsuario`, looks the email
+up in the `usuarios` D1 table, and attaches the row to `Astro.locals.usuario` (typed in `src/env.d.ts`).
+No header/no matching active user → redirect to `/sem-acesso`. `papel` is `'admin' | 'colaborador'`;
+`/admin/*` and `/api/admin/*` are blocked for non-admins in the middleware, and `/admin/exportar` +
+`/api/admin/exportar.ts` each re-check `locals.usuario.papel === 'admin'` server-side as defense in
+depth. In local dev, Cloudflare Access isn't in front of you — fake it by sending the header yourself,
+e.g. `curl -H "Cf-Access-Authenticated-User-Email: you@example.com" http://localhost:4321/`.
+
+### Business rules live in SQL views, not stored columns
+
+`migrations/0002_views.sql` defines `v_clientes_status` (per-client status: `ativo` ≤30d since last
+order, `em_risco` 31–60d, `perdido` >60d, `nunca_comprou`; plus `key_account` when lifetime revenue >
+R$3.000) and `v_kpis_gerais` (ticket médio, taxa de conversão, receita em risco, etc.), both computed
+from `pedidos`/`acoes_comerciais` on every query. Never add a stored "status" or "key_account" column —
+extend the views instead. `src/lib/db.ts` wraps these views and other aggregate queries (by canal, by
+month, retention buckets, commercial execution) as typed functions; page/API code should call those
+functions rather than writing raw SQL inline.
+
+### Historico (audit trail) is written by the API layer, not the DB layer implicitly
+
+`pedidos` and `acoes_comerciais` edits must produce rows in `historico_alteracoes` (one row per changed
+field, old/new value as text). This happens inside `atualizarPedido`/`atualizarAcao` in `src/lib/db.ts`
+via the private `registrarHistorico` diff helper — it compares the fetched "before" row against the
+submitted input field-by-field and only inserts rows for fields that actually changed. `clientes` has no
+edit flow (create-only) and therefore no historico entries; don't add update logic for clientes without
+also deciding whether it needs history tracking.
+
+### Request flow: plain HTML forms → API routes → redirect
+
+Pages under `src/pages/pedidos/`, `src/pages/comercial/`, `src/pages/clientes/` render `<form
+method="post" action="/api/...">` with no client JS. The actual validation + DB write + historico
+logging lives in the matching route under `src/pages/api/` (e.g. `pedidos/novo.astro` posts to
+`api/pedidos/index.ts`, `pedidos/[id].astro` posts to `api/pedidos/[id].ts`). On success the API route
+redirects (303) to the record's detail page; on validation failure it redirects back to the form with
+`?erro=<mensagem>`, which the page reads via `Astro.url.searchParams` and renders through
+`ErrorBanner.astro`. Submitted form state is not preserved across a validation error (the user re-enters
+it) — this is an accepted tradeoff for keeping forms JS-free; don't "fix" it by duplicating form-render
+logic inside the API routes. Astro's built-in CSRF Origin check applies to all these POSTs, so testing
+them with `curl` requires a matching `Origin` header (real browsers send this automatically).
+
+`cliente_id` is always a closed `<select>` populated server-side from the `clientes` table (via
+`FormSelect.astro`) — never a free-text input, to avoid duplicate client names with different spelling.
+
+### Closed enums live in `src/lib/types.ts`, not scattered across pages
+
+`canal`, `status` (pedidos), `canal`/`tipo`/`resultado` (ações comerciais) are CHECK-constrained in SQL
+and mirrored as `{value, label}` arrays in `src/lib/types.ts` (`CANAIS`, `STATUS_PEDIDO`,
+`CANAIS_COMERCIAIS`, `TIPOS_ACAO`, `RESULTADOS_ACAO`). Both form `<select>` options and API-route
+server-side validation read from these same arrays — if you add/rename an enum value, update the DB
+CHECK constraint (new migration), the array in `types.ts`, and nothing else; forms, filters, badges, and
+the xlsx export all derive from it via `labelFor()`.
+
+### Styling: Tailwind v4, tokens/components centralized in one file
+
+`src/styles/global.css` is the single stylesheet (Tailwind v4 CSS-first config via `@theme`/`@layer`,
+no `tailwind.config.js`). Brand color tokens (`--color-brand-*`), base element styles (`input`,
+`select`, `table`, headings), and shared component classes (`.btn-primary`, `.btn-secondary`, `.card`)
+all live here — don't add one-off `<style>` blocks or inline style spaghetti in pages. Status/result
+color mapping for badges is centralized separately in `src/lib/badges.ts` (`badgeClasses()`), consumed
+by `StatusBadge.astro`. **Tailwind v4 gotcha:** `@apply` can only reference real Tailwind utilities, not
+another custom class defined via `@apply` in the same file (v3 allowed chaining custom classes; v4
+doesn't) — write out the full utility list on each component class instead of composing them.
+
+### Export/import mirror the original spreadsheet's column layout, not the DB schema
+
+`/api/admin/exportar.ts` (admin-only) generates a 3-sheet `.xlsx` (Clientes, Pedidos, Ações Comerciais)
+using the `xlsx` (SheetJS) package with `XLSX.utils.aoa_to_sheet` — headers and column order are the
+**spreadsheet's** historical names (e.g. "Canal de Origem", "Status do Pedido"), not the DB's snake_case
+enum keys; values pass through `labelFor()` to convert back to human labels. The "Semana (segunda)"
+column is reconstructed from `data_pedido`/`data_acao` at export time (`segundaFeiraDaSemana()`) — it is
+never stored. `scripts/importar-planilha.ts` is the inverse: it reads CSVs with those same original
+headers, reverse-maps labels back to enum values via the same `CANAIS`/`STATUS_PEDIDO`/etc. arrays, and
+shells out to `wrangler d1 execute --file=<generated .sql>` (it can't use `cloudflare:workers`/D1
+bindings directly since it runs as a plain Bun script outside the Workers runtime). Money is `R$`
+strings/numbers at the spreadsheet boundary but always integer centavos inside the DB and app code —
+convert at the edges (`parseValorReais`, `centavosParaReais`), never carry floats through business
+logic.
+
+### D1 config placeholder
+
+`wrangler.jsonc`'s `d1_databases[0].database_id` is the literal string `REPLACE_WITH_D1_DATABASE_ID`
+until someone runs `wrangler d1 create metalink-dashboard-db` and fills in the real id — local dev
+works fine with the placeholder (wrangler resolves local D1 by name), but `wrangler deploy`/`--remote`
+commands need the real id first.

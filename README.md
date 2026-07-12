@@ -1,43 +1,26 @@
-# Astro Starter Kit: Minimal
+# metalink-dashboard
+
+Dashboard interno da [metalinkbuilding.com.br](https://metalinkbuilding.com.br), substituindo a
+planilha "Controle Operacional — Vendas e Relacionamento.xlsx". Roda em Cloudflare Workers +
+D1, servido em `dashboard.metalinkbuilding.com.br`.
+
+Stack: Astro (SSR) + `@astrojs/cloudflare` + Tailwind CSS v4 + Bun. Autenticação via Cloudflare
+Access (sem login/senha próprio).
+
+## Desenvolvimento
 
 ```sh
-bun create astro@latest -- --template minimal
+bun install
+bun run db:migrate:local   # aplica migrations/0001_init.sql no D1 local
+node node_modules/wrangler/bin/wrangler.js d1 execute metalink-dashboard-db --local --file=./migrations/0002_views.sql
+bun run dev                # sobe o servidor de dev (background daemon; ver CLAUDE.md)
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Veja [CLAUDE.md](./CLAUDE.md) para a arquitetura completa (bindings, auth, regras de negócio,
+export/import, estilo).
 
-## 🚀 Project Structure
+## Deploy
 
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
-
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
-
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `bun install`             | Installs dependencies                            |
-| `bun dev`             | Starts local dev server at `localhost:4321`      |
-| `bun build`           | Build your production site to `./dist/`          |
-| `bun preview`         | Preview your build locally, before deploying     |
-| `bun astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `bun astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+Deploy automático via GitHub Actions a cada push em `main` (`.github/workflows/deploy.yml`),
+usando os secrets `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`. Deploy manual:
+`bun run deploy`.
