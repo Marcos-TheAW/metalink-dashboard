@@ -1,8 +1,16 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import BotaoExcluir from '../../components/BotaoExcluir.astro';
 import StatusBadge from '../../components/StatusBadge.astro';
 import { listClientes, listPedidos } from '../../lib/db';
-import { CANAIS, STATUS_PEDIDO, centavosParaReais, labelFor } from '../../lib/types';
+import {
+  CANAIS,
+  STATUS_PEDIDO,
+  centavosParaReais,
+  formatarDataBR,
+  labelFor,
+  segundaFeiraDaSemana
+} from '../../lib/types';
 
 const usuario = Astro.locals.usuario;
 const url = Astro.url;
@@ -55,36 +63,60 @@ const [pedidos, clientes] = await Promise.all([
     <table>
       <thead>
         <tr>
-          <th>Data</th>
+          <th>Semana (segunda)</th>
           <th>Cliente</th>
-          <th>Canal</th>
-          <th>Links</th>
-          <th>Valor</th>
-          <th>Status</th>
+          <th>Canal de Origem</th>
+          <th>Quantidade de Links</th>
+          <th>Valor Total</th>
+          <th>Data do Pedido</th>
+          <th>Prazo de Entrega</th>
+          <th>Status do Pedido</th>
+          <th>Link da Planilha do Cliente</th>
+          <th>Ações</th>
         </tr>
       </thead>
       <tbody>
         {
           pedidos.map((p) => (
             <tr>
+              <td>{formatarDataBR(segundaFeiraDaSemana(p.data_pedido))}</td>
               <td>
                 <a href={`/pedidos/${p.id}`} class="font-medium text-brand-600 hover:underline">
-                  {p.data_pedido}
+                  {p.cliente_nome}
                 </a>
               </td>
-              <td>{p.cliente_nome}</td>
               <td>{labelFor(CANAIS, p.canal)}</td>
               <td>{p.qtd_links}</td>
               <td>{centavosParaReais(p.valor_centavos)}</td>
+              <td>{formatarDataBR(p.data_pedido)}</td>
+              <td>{formatarDataBR(p.prazo_entrega)}</td>
               <td>
                 <StatusBadge value={p.status} label={labelFor(STATUS_PEDIDO, p.status)} />
+              </td>
+              <td>
+                {p.link_detalhe ? (
+                  <a href={p.link_detalhe} target="_blank" rel="noopener noreferrer" class="text-brand-600 hover:underline">
+                    Abrir
+                  </a>
+                ) : (
+                  '—'
+                )}
+              </td>
+              <td class="whitespace-nowrap">
+                <a href={`/pedidos/${p.id}`} class="text-brand-600 hover:underline text-sm">Editar</a>
+                <span class="mx-1.5 text-slate-300">·</span>
+                <BotaoExcluir
+                  action={`/api/pedidos/${p.id}/excluir`}
+                  mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o pedido de ${p.cliente_nome} (${p.data_pedido})? Todos os dados desse pedido serão perdidos permanentemente.`}
+                  compacto
+                />
               </td>
             </tr>
           ))
         }
         {pedidos.length === 0 && (
           <tr>
-            <td colspan="6" class="text-center text-slate-400">Nenhum pedido encontrado para esses filtros.</td>
+            <td colspan="10" class="text-center text-slate-400">Nenhum pedido encontrado para esses filtros.</td>
           </tr>
         )}
       </tbody>

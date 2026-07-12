@@ -336,6 +336,10 @@ export async function atualizarPedido(
   );
 }
 
+export async function deletarPedido(id: number): Promise<void> {
+  await db().prepare('DELETE FROM pedidos WHERE id = ?').bind(id).run();
+}
+
 // ---------- Ações Comerciais ----------
 
 export interface FiltrosAcoes {

@@ -81,6 +81,20 @@ export function centavosParaReais(centavos: number): string {
   return (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+export function formatarDataBR(dataISO: string | null): string {
+  if (!dataISO) return '—';
+  const [ano, mes, dia] = dataISO.slice(0, 10).split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+export function segundaFeiraDaSemana(dataISO: string): string {
+  const data = new Date(`${dataISO}T00:00:00Z`);
+  const diaSemana = data.getUTCDay();
+  const diff = diaSemana === 0 ? -6 : 1 - diaSemana;
+  data.setUTCDate(data.getUTCDate() + diff);
+  return data.toISOString().slice(0, 10);
+}
+
 export interface Usuario {
   id: number;
   email: string;

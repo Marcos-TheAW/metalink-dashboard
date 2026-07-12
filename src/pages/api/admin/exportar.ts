@@ -9,16 +9,9 @@ import {
   STATUS_RELACIONAMENTO_LABEL,
   TIPOS_ACAO,
   labelFor,
+  segundaFeiraDaSemana,
   type StatusRelacionamento
 } from '../../../lib/types';
-
-function segundaFeiraDaSemana(dataISO: string): string {
-  const data = new Date(`${dataISO}T00:00:00Z`);
-  const diaSemana = data.getUTCDay();
-  const diff = diaSemana === 0 ? -6 : 1 - diaSemana;
-  data.setUTCDate(data.getUTCDate() + diff);
-  return data.toISOString().slice(0, 10);
-}
 
 export const GET: APIRoute = async ({ locals }) => {
   // Checagem redundante: o middleware já bloqueia /api/admin para não-admins,

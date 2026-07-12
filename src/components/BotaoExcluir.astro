@@ -1,0 +1,14 @@
+---
+interface Props {
+  action: string;
+  mensagemConfirmacao: string;
+  compacto?: boolean;
+}
+
+const { action, mensagemConfirmacao, compacto = false } = Astro.props;
+const onsubmit = `return confirm(${JSON.stringify(mensagemConfirmacao)})`;
+---
+
+<form method="post" action={action} onsubmit={onsubmit} class="inline">
+  <button type="submit" class={compacto ? 'link-danger text-sm' : 'btn-danger'}>Excluir</button>
+</form>

@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import BotaoExcluir from '../../components/BotaoExcluir.astro';
 import ErrorBanner from '../../components/ErrorBanner.astro';
 import FormSelect from '../../components/FormSelect.astro';
 import { getPedido, listClientes, listHistorico, listUsuariosAtivos } from '../../lib/db';
@@ -75,6 +76,13 @@ const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome
             <a href="/pedidos" class="btn-secondary">Voltar</a>
           </div>
         </form>
+
+        <div class="mt-4">
+          <BotaoExcluir
+            action={`/api/pedidos/${pedido.id}/excluir`}
+            mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o pedido #${pedido.id} (${pedido.data_pedido})? Todos os dados desse pedido serão perdidos permanentemente.`}
+          />
+        </div>
 
         <section class="mt-8">
           <h2 class="mb-3">Histórico de alterações</h2>
