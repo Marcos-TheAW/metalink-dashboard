@@ -5,22 +5,27 @@ const ROTAS_PUBLICAS = ['/sem-acesso'];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
+  let response: Response;
 
   if (ROTAS_PUBLICAS.includes(pathname) || pathname.startsWith('/_')) {
-    return next();
+    response = await next();
+  } else {
+    const usuario = await resolveUsuario(context.request);
+
+    if (!usuario) {
+      response = context.redirect('/sem-acesso');
+    } else {
+      context.locals.usuario = usuario;
+
+      if ((pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) && usuario.papel !== 'admin') {
+        response = new Response('Acesso restrito a administradores.', { status: 403 });
+      } else {
+        response = await next();
+      }
+    }
   }
 
-  const usuario = await resolveUsuario(context.request);
-
-  if (!usuario) {
-    return context.redirect('/sem-acesso');
-  }
-
-  context.locals.usuario = usuario;
-
-  if ((pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) && usuario.papel !== 'admin') {
-    return new Response('Acesso restrito a administradores.', { status: 403 });
-  }
-
-  return next();
+  // Ferramenta interna: nunca deve aparecer em buscadores, mesmo se a URL vazar.
+  response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  return response;
 });
