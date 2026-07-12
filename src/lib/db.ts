@@ -100,7 +100,10 @@ export interface KpiPorMes {
 export async function getKpisPorMes(): Promise<KpiPorMes[]> {
   const { results } = await db()
     .prepare(
-      `SELECT strftime('%Y-%m', data_pedido) AS mes,
+      // O mês de um pedido é o mês da segunda-feira da sua semana (não o dia exato do
+      // pedido) — assim uma semana que atravessa a virada do mês fica inteira num só mês,
+      // em vez de picotada entre os dois.
+      `SELECT strftime('%Y-%m', date(data_pedido, '-' || ((CAST(strftime('%w', data_pedido) AS INTEGER) + 6) % 7) || ' days')) AS mes,
               COUNT(*) AS total_pedidos,
               COALESCE(SUM(qtd_links), 0) AS total_links,
               COALESCE(SUM(valor_centavos), 0) AS receita_centavos,
