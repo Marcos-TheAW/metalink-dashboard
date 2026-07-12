@@ -345,6 +345,7 @@ export async function deletarPedido(id: number): Promise<void> {
 export interface FiltrosAcoes {
   tipo?: string;
   resultado?: string;
+  canal?: string;
   cliente_id?: number;
 }
 
@@ -362,6 +363,10 @@ export async function listAcoes(filtros: FiltrosAcoes = {}): Promise<AcaoComComC
   if (filtros.resultado) {
     clauses.push('a.resultado = ?');
     params.push(filtros.resultado);
+  }
+  if (filtros.canal) {
+    clauses.push('a.canal = ?');
+    params.push(filtros.canal);
   }
   if (filtros.cliente_id) {
     clauses.push('a.cliente_id = ?');

@@ -17,6 +17,7 @@ import {
   TIPOS_ACAO,
   centavosParaReais,
   labelFor,
+  nomeMes,
   type StatusRelacionamento
 } from '../lib/types';
 
@@ -193,7 +194,7 @@ const linhasExecucaoVendas = [
         {
           porMes.map((row) => (
             <tr>
-              <td>{row.mes}</td>
+              <td>{nomeMes(row.mes)}</td>
               <td>{row.total_pedidos}</td>
               <td>{row.total_links}</td>
               <td>{centavosParaReais(row.receita_centavos)}</td>

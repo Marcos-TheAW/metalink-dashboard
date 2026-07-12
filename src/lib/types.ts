@@ -95,6 +95,27 @@ export function segundaFeiraDaSemana(dataISO: string): string {
   return data.toISOString().slice(0, 10);
 }
 
+const NOMES_MESES = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro'
+];
+
+export function nomeMes(mesISO: string): string {
+  const [ano, mes] = mesISO.split('-');
+  const nome = NOMES_MESES[parseInt(mes, 10) - 1];
+  return nome ? `${nome}/${ano}` : mesISO;
+}
+
 export interface Usuario {
   id: number;
   email: string;

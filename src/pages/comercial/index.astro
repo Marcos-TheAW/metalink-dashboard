@@ -2,18 +2,26 @@
 import Layout from '../../layouts/Layout.astro';
 import StatusBadge from '../../components/StatusBadge.astro';
 import { listAcoes, listClientes } from '../../lib/db';
-import { CANAIS_COMERCIAIS, RESULTADOS_ACAO, TIPOS_ACAO, labelFor } from '../../lib/types';
+import {
+  CANAIS_COMERCIAIS,
+  RESULTADOS_ACAO,
+  TIPOS_ACAO,
+  formatarDataBR,
+  labelFor,
+  segundaFeiraDaSemana
+} from '../../lib/types';
 
 const usuario = Astro.locals.usuario;
 const url = Astro.url;
 
 const tipo = url.searchParams.get('tipo') ?? '';
 const resultado = url.searchParams.get('resultado') ?? '';
+const canal = url.searchParams.get('canal') ?? '';
 const clienteIdRaw = url.searchParams.get('cliente_id') ?? '';
 const clienteId = clienteIdRaw ? Number(clienteIdRaw) : undefined;
 
 const [acoes, clientes] = await Promise.all([
-  listAcoes({ tipo: tipo || undefined, resultado: resultado || undefined, cliente_id: clienteId }),
+  listAcoes({ tipo: tipo || undefined, resultado: resultado || undefined, canal: canal || undefined, cliente_id: clienteId }),
   listClientes()
 ]);
 ---
@@ -24,7 +32,7 @@ const [acoes, clientes] = await Promise.all([
     <a href="/comercial/novo" class="btn-primary">Nova ação</a>
   </div>
 
-  <form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+  <form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
     <div>
       <label for="tipo">Tipo de Ação</label>
       <select id="tipo" name="tipo">
@@ -37,6 +45,13 @@ const [acoes, clientes] = await Promise.all([
       <select id="resultado" name="resultado">
         <option value="">Todos</option>
         {RESULTADOS_ACAO.map((r) => <option value={r.value} selected={r.value === resultado}>{r.label}</option>)}
+      </select>
+    </div>
+    <div>
+      <label for="canal">Canal</label>
+      <select id="canal" name="canal">
+        <option value="">Todos</option>
+        {CANAIS_COMERCIAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
       </select>
     </div>
     <div>
@@ -55,34 +70,36 @@ const [acoes, clientes] = await Promise.all([
     <table>
       <thead>
         <tr>
-          <th>Data</th>
+          <th>Semana (segunda)</th>
           <th>Cliente / Prospect</th>
           <th>Canal</th>
-          <th>Tipo</th>
+          <th>Tipo de Ação</th>
           <th>Resultado</th>
+          <th>Observações</th>
         </tr>
       </thead>
       <tbody>
         {
           acoes.map((a) => (
             <tr>
+              <td>{formatarDataBR(segundaFeiraDaSemana(a.data_acao))}</td>
               <td>
                 <a href={`/comercial/${a.id}`} class="font-medium text-brand-600 hover:underline">
-                  {a.data_acao}
+                  {a.cliente_nome}
                 </a>
               </td>
-              <td>{a.cliente_nome}</td>
               <td>{labelFor(CANAIS_COMERCIAIS, a.canal)}</td>
               <td>{labelFor(TIPOS_ACAO, a.tipo)}</td>
               <td>
                 <StatusBadge value={a.resultado} label={labelFor(RESULTADOS_ACAO, a.resultado)} />
               </td>
+              <td>{a.observacoes ?? '—'}</td>
             </tr>
           ))
         }
         {acoes.length === 0 && (
           <tr>
-            <td colspan="5" class="text-center text-slate-400">Nenhuma ação encontrada para esses filtros.</td>
+            <td colspan="6" class="text-center text-slate-400">Nenhuma ação encontrada para esses filtros.</td>
           </tr>
         )}
       </tbody>
