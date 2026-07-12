@@ -4,6 +4,7 @@ import KpiCard from '../components/KpiCard.astro';
 import StatusBadge from '../components/StatusBadge.astro';
 import {
   getExecucaoComercial,
+  getExecucaoVendas,
   getKpisGerais,
   getKpisPorCanal,
   getKpisPorMes,
@@ -21,16 +22,62 @@ import {
 
 const usuario = Astro.locals.usuario;
 
-const [kpis, porCanal, porMes, retencao, execucao] = await Promise.all([
+const [kpis, porCanal, porMes, retencao, execucao, execucaoVendas] = await Promise.all([
   getKpisGerais(),
   getKpisPorCanal(),
   getKpisPorMes(),
   getRetencaoClientes(),
-  getExecucaoComercial()
+  getExecucaoComercial(),
+  getExecucaoVendas()
 ]);
 
 const ordemStatus: StatusRelacionamento[] = ['ativo', 'em_risco', 'perdido', 'nunca_comprou'];
 const retencaoMap = new Map(retencao.map((r) => [r.status_relacionamento, r.total]));
+
+function formatarNumero(valor: number, casas = 0): string {
+  return valor.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+function formatarDataBR(iso: string): string {
+  if (!iso) return '';
+  const [, mes, dia] = iso.split('-');
+  return `${dia}/${mes}`;
+}
+
+const semanas = execucaoVendas.semanas_decorridas;
+const ticketMedioGeralCentavos =
+  execucaoVendas.total_pedidos > 0 ? execucaoVendas.total_receita_centavos / execucaoVendas.total_pedidos : 0;
+const ticketMedioUltimaSemanaCentavos =
+  execucaoVendas.ultima_semana_pedidos > 0
+    ? execucaoVendas.ultima_semana_receita_centavos / execucaoVendas.ultima_semana_pedidos
+    : null;
+
+const linhasExecucaoVendas = [
+  {
+    metrica: 'Pedidos Recebidos',
+    total: formatarNumero(execucaoVendas.total_pedidos),
+    media: semanas > 0 ? formatarNumero(execucaoVendas.total_pedidos / semanas, 1) : '-',
+    ultimaSemana: formatarNumero(execucaoVendas.ultima_semana_pedidos)
+  },
+  {
+    metrica: 'Links Vendidos',
+    total: formatarNumero(execucaoVendas.total_links),
+    media: semanas > 0 ? formatarNumero(execucaoVendas.total_links / semanas, 1) : '-',
+    ultimaSemana: formatarNumero(execucaoVendas.ultima_semana_links)
+  },
+  {
+    metrica: 'Receita Total',
+    total: centavosParaReais(execucaoVendas.total_receita_centavos),
+    media: semanas > 0 ? centavosParaReais(Math.round(execucaoVendas.total_receita_centavos / semanas)) : '-',
+    ultimaSemana: centavosParaReais(execucaoVendas.ultima_semana_receita_centavos)
+  },
+  {
+    metrica: 'Ticket Médio por Pedido',
+    total: centavosParaReais(ticketMedioGeralCentavos),
+    media: '-',
+    ultimaSemana: ticketMedioUltimaSemanaCentavos !== null ? centavosParaReais(ticketMedioUltimaSemanaCentavos) : '-'
+  }
+];
 ---
 
 <Layout title="Dashboard" usuario={usuario}>
@@ -47,6 +94,32 @@ const retencaoMap = new Map(retencao.map((r) => [r.status_relacionamento, r.tota
       hint={`${kpis.acoes_convertidas} de ${kpis.total_acoes} ações`}
     />
     <KpiCard label="Receita em risco" value={centavosParaReais(kpis.receita_em_risco_centavos)} hint="Clientes em risco ou perdidos" />
+  </section>
+
+  <section class="mt-6 card">
+    <h2>Execução de Vendas</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>Total Acumulado</th>
+          <th>Média por Semana</th>
+          <th>{`Última Semana (${formatarDataBR(execucaoVendas.ultima_semana_inicio)} – ${formatarDataBR(execucaoVendas.ultima_semana_fim)})`}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          linhasExecucaoVendas.map((linha) => (
+            <tr>
+              <td class="font-medium text-slate-900">{linha.metrica}</td>
+              <td>{linha.total}</td>
+              <td>{linha.media}</td>
+              <td>{linha.ultimaSemana}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
   </section>
 
   <section class="mt-8 grid gap-6 lg:grid-cols-2">
@@ -110,8 +183,10 @@ const retencaoMap = new Map(retencao.map((r) => [r.status_relacionamento, r.tota
       <thead>
         <tr>
           <th>Mês</th>
-          <th>Pedidos</th>
-          <th>Receita</th>
+          <th>Pedidos Recebidos</th>
+          <th>Links Vendidos</th>
+          <th>Receita Total</th>
+          <th>Ticket Médio</th>
         </tr>
       </thead>
       <tbody>
@@ -120,13 +195,15 @@ const retencaoMap = new Map(retencao.map((r) => [r.status_relacionamento, r.tota
             <tr>
               <td>{row.mes}</td>
               <td>{row.total_pedidos}</td>
+              <td>{row.total_links}</td>
               <td>{centavosParaReais(row.receita_centavos)}</td>
+              <td>{centavosParaReais(row.ticket_medio_centavos)}</td>
             </tr>
           ))
         }
         {porMes.length === 0 && (
           <tr>
-            <td colspan="3" class="text-center text-slate-400">Nenhum pedido registrado ainda.</td>
+            <td colspan="5" class="text-center text-slate-400">Nenhum pedido registrado ainda.</td>
           </tr>
         )}
       </tbody>

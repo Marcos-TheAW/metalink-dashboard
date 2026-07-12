@@ -92,7 +92,9 @@ export async function getKpisPorCanal(): Promise<KpiPorCanal[]> {
 export interface KpiPorMes {
   mes: string;
   total_pedidos: number;
+  total_links: number;
   receita_centavos: number;
+  ticket_medio_centavos: number;
 }
 
 export async function getKpisPorMes(): Promise<KpiPorMes[]> {
@@ -100,13 +102,44 @@ export async function getKpisPorMes(): Promise<KpiPorMes[]> {
     .prepare(
       `SELECT strftime('%Y-%m', data_pedido) AS mes,
               COUNT(*) AS total_pedidos,
-              COALESCE(SUM(valor_centavos), 0) AS receita_centavos
+              COALESCE(SUM(qtd_links), 0) AS total_links,
+              COALESCE(SUM(valor_centavos), 0) AS receita_centavos,
+              CASE WHEN COUNT(*) = 0 THEN 0 ELSE CAST(SUM(valor_centavos) AS REAL) / COUNT(*) END AS ticket_medio_centavos
        FROM pedidos
        GROUP BY mes
        ORDER BY mes`
     )
     .all<KpiPorMes>();
   return results;
+}
+
+export interface ExecucaoVendas {
+  total_pedidos: number;
+  total_links: number;
+  total_receita_centavos: number;
+  ultima_semana_pedidos: number;
+  ultima_semana_links: number;
+  ultima_semana_receita_centavos: number;
+  ultima_semana_inicio: string;
+  ultima_semana_fim: string;
+  semanas_decorridas: number;
+}
+
+export async function getExecucaoVendas(): Promise<ExecucaoVendas> {
+  const row = await db().prepare('SELECT * FROM v_execucao_vendas').first<ExecucaoVendas>();
+  return (
+    row ?? {
+      total_pedidos: 0,
+      total_links: 0,
+      total_receita_centavos: 0,
+      ultima_semana_pedidos: 0,
+      ultima_semana_links: 0,
+      ultima_semana_receita_centavos: 0,
+      ultima_semana_inicio: '',
+      ultima_semana_fim: '',
+      semanas_decorridas: 0
+    }
+  );
 }
 
 export interface RetencaoClientes {
