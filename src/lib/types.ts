@@ -51,10 +51,10 @@ export const CANAIS_COMERCIAIS: { value: CanalComercial; label: string }[] = [
 ];
 
 export const TIPOS_ACAO: { value: TipoAcao; label: string }[] = [
-  { value: 'follow_up_risco', label: 'Follow-up de Risco' },
+  { value: 'follow_up_risco', label: 'Follow-up Cliente em Risco' },
   { value: 'proposta_nova', label: 'Proposta Nova' },
   { value: 'upsell_cross_sell', label: 'Upsell / Cross-sell' },
-  { value: 'prospeccao_novo_cliente', label: 'Prospecção de Novo Cliente' },
+  { value: 'prospeccao_novo_cliente', label: 'Prospecção Novo Cliente' },
   { value: 'reativacao_cliente_perdido', label: 'Reativação de Cliente Perdido' }
 ];
 
