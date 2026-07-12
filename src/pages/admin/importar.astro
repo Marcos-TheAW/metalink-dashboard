@@ -1,0 +1,138 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { processarImportacaoXlsx, type ResultadoImportacao } from '../../lib/importacao';
+
+const usuario = Astro.locals.usuario;
+
+// Checagem redundante: o middleware já retorna 403 para não-admins em /admin.
+if (usuario.papel !== 'admin') {
+  return new Response('Acesso restrito a administradores.', { status: 403 });
+}
+
+let resultado: ResultadoImportacao | null = null;
+let erro: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const arquivo = form.get('arquivo');
+    if (!(arquivo instanceof File) || arquivo.size === 0) {
+      erro = 'Selecione um arquivo .xlsx antes de enviar.';
+    } else {
+      const buffer = await arquivo.arrayBuffer();
+      resultado = await processarImportacaoXlsx(buffer, usuario.id);
+    }
+  } catch (e) {
+    erro = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
+  }
+}
+---
+
+<Layout title="Importar planilha" usuario={usuario}>
+  <h1 class="mb-6">Importar planilha</h1>
+
+  <div class="card max-w-2xl">
+    <p class="text-sm text-slate-600">
+      Envie o arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> original (o
+      mesmo formato exportado em <a href="/admin/exportar" class="text-brand-600 hover:underline">Exportar</a>).
+      Abas reconhecidas: <strong>Clientes</strong>, <strong>Pedidos</strong> e
+      <strong>Ações Comerciais</strong> — pode enviar só algumas, não precisa ter as três.
+      Clientes citados em Pedidos ou Ações que ainda não existem são cadastrados automaticamente.
+      Linhas com cliente/canal/status/data/valor que não batem com o esperado são puladas e listadas
+      abaixo, sem interromper o resto da importação.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div class="flex-1">
+        <label for="arquivo">Arquivo .xlsx</label>
+        <input type="file" id="arquivo" name="arquivo" accept=".xlsx" required />
+      </div>
+      <button type="submit" class="btn-primary">Importar</button>
+    </form>
+  </div>
+
+  {
+    erro && (
+      <div class="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {erro}
+      </div>
+    )
+  }
+
+  {
+    resultado && (
+      <div class="mt-6 flex flex-col gap-4">
+        <div class="card">
+          <h2>Resumo</h2>
+          <p class="mt-2 text-sm text-slate-600">
+            Abas encontradas: {resultado.planilhasEncontradas.join(', ')}
+          </p>
+          <dl class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Clientes processados</dt>
+              <dd class="text-xl font-semibold">{resultado.clientesProcessados}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Pedidos inseridos</dt>
+              <dd class="text-xl font-semibold">{resultado.pedidosInseridos}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Ações inseridas</dt>
+              <dd class="text-xl font-semibold">{resultado.acoesInseridas}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Linhas ignoradas</dt>
+              <dd class="text-xl font-semibold">
+                {resultado.pedidosIgnorados.length + resultado.acoesIgnoradas.length}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        {resultado.pedidosIgnorados.length > 0 && (
+          <div class="card">
+            <h2>Pedidos ignorados</h2>
+            <table class="mt-3">
+              <thead>
+                <tr>
+                  <th>Linha na planilha</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultado.pedidosIgnorados.map((item) => (
+                  <tr>
+                    <td>{item.linha}</td>
+                    <td>{item.motivo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {resultado.acoesIgnoradas.length > 0 && (
+          <div class="card">
+            <h2>Ações comerciais ignoradas</h2>
+            <table class="mt-3">
+              <thead>
+                <tr>
+                  <th>Linha na planilha</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultado.acoesIgnoradas.map((item) => (
+                  <tr>
+                    <td>{item.linha}</td>
+                    <td>{item.motivo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+</Layout>

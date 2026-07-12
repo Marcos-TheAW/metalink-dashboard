@@ -44,6 +44,16 @@ const links = [
               {
                 usuario.papel === 'admin' && (
                   <a
+                    href="/admin/importar"
+                    class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  >
+                    Importar
+                  </a>
+                )
+              }
+              {
+                usuario.papel === 'admin' && (
+                  <a
                     href="/admin/exportar"
                     class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   >
