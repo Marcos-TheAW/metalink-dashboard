@@ -65,7 +65,8 @@ export const GET: APIRoute = async ({ locals }) => {
     'Data do Pedido',
     'Prazo de Entrega',
     'Status do Pedido',
-    'Link da Planilha de Detalhe'
+    'Link da Planilha de Detalhe',
+    'Observação'
   ];
   const pedidosRows = pedidos.map((p) => [
     segundaFeiraDaSemana(p.data_pedido),
@@ -76,7 +77,8 @@ export const GET: APIRoute = async ({ locals }) => {
     p.data_pedido,
     p.prazo_entrega ?? '',
     labelFor(STATUS_PEDIDO, p.status),
-    p.link_detalhe ?? ''
+    p.link_detalhe ?? '',
+    p.observacao ?? ''
   ]);
 
   const acoesHeader = [

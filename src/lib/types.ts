@@ -120,6 +120,7 @@ export interface Pedido {
   prazo_entrega: string | null;
   status: StatusPedido;
   link_detalhe: string | null;
+  observacao: string | null;
   responsavel_id: number | null;
   criado_por: number;
   criado_em: string;

@@ -13,6 +13,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const prazoEntrega = String(form.get('prazo_entrega') ?? '').trim() || null;
   const status = String(form.get('status') ?? '');
   const linkDetalhe = String(form.get('link_detalhe') ?? '').trim() || null;
+  const observacao = String(form.get('observacao') ?? '').trim() || null;
   const responsavelIdRaw = String(form.get('responsavel_id') ?? '');
   const responsavelId = responsavelIdRaw ? Number(responsavelIdRaw) : null;
   const valorCentavos = Math.round(parseFloat(valorReais) * 100);
@@ -39,6 +40,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       prazo_entrega: prazoEntrega,
       status,
       link_detalhe: linkDetalhe,
+      observacao,
       responsavel_id: responsavelId
     },
     locals.usuario.id

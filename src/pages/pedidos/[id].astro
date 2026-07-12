@@ -65,6 +65,11 @@ const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome
             <input type="url" id="link_detalhe" name="link_detalhe" value={pedido.link_detalhe ?? ''} placeholder="https://…" />
           </div>
 
+          <div class="sm:col-span-2">
+            <label for="observacao">Observação</label>
+            <textarea id="observacao" name="observacao" rows="3" placeholder="Alguma informação específica sobre esse pedido…">{pedido.observacao ?? ''}</textarea>
+          </div>
+
           <div class="flex gap-3 sm:col-span-2">
             <button type="submit" class="btn-primary">Salvar alterações</button>
             <a href="/pedidos" class="btn-secondary">Voltar</a>

@@ -58,6 +58,11 @@ const hoje = new Date().toISOString().slice(0, 10);
           <input type="url" id="link_detalhe" name="link_detalhe" placeholder="https://…" />
         </div>
 
+        <div class="sm:col-span-2">
+          <label for="observacao">Observação</label>
+          <textarea id="observacao" name="observacao" rows="3" placeholder="Alguma informação específica sobre esse pedido…"></textarea>
+        </div>
+
         <div class="flex gap-3 sm:col-span-2">
           <button type="submit" class="btn-primary">Salvar pedido</button>
           <a href="/pedidos" class="btn-secondary">Cancelar</a>

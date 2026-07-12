@@ -15,7 +15,7 @@
 		{
 			"binding": "DB",
 			"database_name": "metalink-dashboard-db",
-			"database_id": "REPLACE_WITH_D1_DATABASE_ID",
+			"database_id": "060a7f5f-3b3a-413e-9e13-1d8a518e516b",
 			"migrations_dir": "migrations"
 		}
 	]

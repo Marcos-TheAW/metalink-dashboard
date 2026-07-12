@@ -266,6 +266,7 @@ export interface PedidoInput {
   prazo_entrega: string | null;
   status: string;
   link_detalhe: string | null;
+  observacao: string | null;
   responsavel_id: number | null;
 }
 
@@ -273,8 +274,8 @@ export async function criarPedido(input: PedidoInput, usuarioId: number): Promis
   const result = await db()
     .prepare(
       `INSERT INTO pedidos
-         (cliente_id, canal, qtd_links, valor_centavos, data_pedido, prazo_entrega, status, link_detalhe, responsavel_id, criado_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (cliente_id, canal, qtd_links, valor_centavos, data_pedido, prazo_entrega, status, link_detalhe, observacao, responsavel_id, criado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       input.cliente_id,
@@ -285,6 +286,7 @@ export async function criarPedido(input: PedidoInput, usuarioId: number): Promis
       input.prazo_entrega,
       input.status,
       input.link_detalhe,
+      input.observacao,
       input.responsavel_id,
       usuarioId
     )
@@ -304,7 +306,7 @@ export async function atualizarPedido(
     .prepare(
       `UPDATE pedidos
           SET cliente_id = ?, canal = ?, qtd_links = ?, valor_centavos = ?, data_pedido = ?,
-              prazo_entrega = ?, status = ?, link_detalhe = ?, responsavel_id = ?, atualizado_em = datetime('now')
+              prazo_entrega = ?, status = ?, link_detalhe = ?, observacao = ?, responsavel_id = ?, atualizado_em = datetime('now')
         WHERE id = ?`
     )
     .bind(
@@ -316,6 +318,7 @@ export async function atualizarPedido(
       input.prazo_entrega,
       input.status,
       input.link_detalhe,
+      input.observacao,
       input.responsavel_id,
       id
     )

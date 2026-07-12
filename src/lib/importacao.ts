@@ -204,14 +204,15 @@ export async function processarImportacaoXlsx(
     const qtdLinks = parseInt(linha['Qtd. de Links'] || '1', 10) || 1;
     const prazoEntrega = parseData(linha['Prazo de Entrega'] ?? '');
     const linkDetalhe = (linha['Link da Planilha de Detalhe'] ?? '').trim() || null;
+    const observacao = (linha['Observação'] ?? '').trim() || null;
 
     pedidosStatements.push(
       db()
         .prepare(
-          `INSERT INTO pedidos (cliente_id, canal, qtd_links, valor_centavos, data_pedido, prazo_entrega, status, link_detalhe, criado_por)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO pedidos (cliente_id, canal, qtd_links, valor_centavos, data_pedido, prazo_entrega, status, link_detalhe, observacao, criado_por)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(clienteId, canal, qtdLinks, valorCentavos, dataPedido, prazoEntrega, status, linkDetalhe, usuarioId)
+        .bind(clienteId, canal, qtdLinks, valorCentavos, dataPedido, prazoEntrega, status, linkDetalhe, observacao, usuarioId)
     );
   });
 

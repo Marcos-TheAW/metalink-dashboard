@@ -280,10 +280,11 @@ async function main() {
     const dataPedido = parseData(linha['Data do Pedido']);
     const prazoEntrega = linha['Prazo de Entrega'] ? parseData(linha['Prazo de Entrega']) : null;
     const linkDetalhe = linha['Link da Planilha de Detalhe'] || null;
+    const observacao = linha['Observação'] || null;
 
     pedidosStatements.push(
-      `INSERT INTO pedidos (cliente_id, canal, qtd_links, valor_centavos, data_pedido, prazo_entrega, status, link_detalhe, criado_por)
-       VALUES (${clienteId}, ${sqlString(canal)}, ${qtdLinks}, ${valorCentavos}, ${sqlString(dataPedido)}, ${sqlString(prazoEntrega)}, ${sqlString(status)}, ${sqlString(linkDetalhe)}, ${usuarioId});`
+      `INSERT INTO pedidos (cliente_id, canal, qtd_links, valor_centavos, data_pedido, prazo_entrega, status, link_detalhe, observacao, criado_por)
+       VALUES (${clienteId}, ${sqlString(canal)}, ${qtdLinks}, ${valorCentavos}, ${sqlString(dataPedido)}, ${sqlString(prazoEntrega)}, ${sqlString(status)}, ${sqlString(linkDetalhe)}, ${sqlString(observacao)}, ${usuarioId});`
     );
   }
 
