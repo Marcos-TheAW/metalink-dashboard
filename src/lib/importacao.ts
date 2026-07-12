@@ -41,9 +41,18 @@ function normalizarChaves(linha: Linha): Linha {
   return normalizada;
 }
 
+function normalizarNomeAba(nome: string): string {
+  // Remove emojis/símbolos (ex: "📦 Pedidos" -> "pedidos"), mantendo só letras e espaços.
+  return nome
+    .replace(/[^\p{L}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function encontrarPlanilha(workbook: XLSX.WorkBook, nomesAceitos: string[]): XLSX.WorkSheet | null {
-  const alvo = nomesAceitos.map((n) => n.toLowerCase());
-  const nomeReal = workbook.SheetNames.find((n) => alvo.includes(n.trim().toLowerCase()));
+  const alvo = nomesAceitos.map(normalizarNomeAba);
+  const nomeReal = workbook.SheetNames.find((n) => alvo.includes(normalizarNomeAba(n)));
   return nomeReal ? workbook.Sheets[nomeReal] : null;
 }
 
