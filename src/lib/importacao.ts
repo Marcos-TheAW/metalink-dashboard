@@ -62,6 +62,12 @@ function lerLinhas(planilha: XLSX.WorkSheet | null): Linha[] {
   return linhas.map(normalizarChaves);
 }
 
+function obterCabecalhos(planilha: XLSX.WorkSheet | null): string[] {
+  if (!planilha) return [];
+  const linhas = XLSX.utils.sheet_to_json<string[]>(planilha, { header: 1, raw: false, defval: '' });
+  return (linhas[0] ?? []).map((h) => String(h ?? '').trim()).filter(Boolean);
+}
+
 async function executarEmLotes(statements: D1PreparedStatement[], tamanhoLote = 40): Promise<void> {
   for (let i = 0; i < statements.length; i += tamanhoLote) {
     await db().batch(statements.slice(i, i + tamanhoLote));
@@ -75,6 +81,7 @@ export interface LinhaIgnorada {
 
 export interface ResultadoImportacao {
   planilhasEncontradas: string[];
+  cabecalhosDetectados: Record<string, string[]>;
   clientesProcessados: number;
   pedidosInseridos: number;
   pedidosIgnorados: LinhaIgnorada[];
@@ -105,6 +112,11 @@ export async function processarImportacaoXlsx(
         `(sem diferenciar maiúsculas/minúsculas). O arquivo enviado tem estas abas: ${nomesNoArquivo}.`
     );
   }
+
+  const cabecalhosDetectados: Record<string, string[]> = {};
+  if (planClientes) cabecalhosDetectados['Clientes'] = obterCabecalhos(planClientes);
+  if (planPedidos) cabecalhosDetectados['Pedidos'] = obterCabecalhos(planPedidos);
+  if (planAcoes) cabecalhosDetectados['Ações Comerciais'] = obterCabecalhos(planAcoes);
 
   const linhasClientes = lerLinhas(planClientes);
   const linhasPedidos = lerLinhas(planPedidos);
@@ -237,6 +249,7 @@ export async function processarImportacaoXlsx(
 
   return {
     planilhasEncontradas,
+    cabecalhosDetectados,
     clientesProcessados: nomesClientes.size,
     pedidosInseridos: pedidosStatements.length,
     pedidosIgnorados,
