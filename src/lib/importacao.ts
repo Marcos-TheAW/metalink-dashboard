@@ -14,10 +14,17 @@ function labelParaValor(lista: { value: string; label: string }[], texto: string
 }
 
 function parseValorReais(texto: string): number | null {
-  const limpo = texto.replace(/[R$\s]/g, '');
+  let limpo = texto.replace(/[R$\s]/g, '');
   if (!limpo) return null;
-  const normalizado = limpo.includes(',') ? limpo.replace(/\./g, '').replace(',', '.') : limpo;
-  const valor = parseFloat(normalizado);
+  const ultimaVirgula = limpo.lastIndexOf(',');
+  const ultimoPonto = limpo.lastIndexOf('.');
+  if (ultimaVirgula !== -1 && ultimoPonto !== -1) {
+    // O separador decimal é o que aparece por último; o outro é milhar e é descartado.
+    limpo = ultimoPonto > ultimaVirgula ? limpo.replace(/,/g, '') : limpo.replace(/\./g, '').replace(',', '.');
+  } else if (ultimaVirgula !== -1) {
+    limpo = limpo.replace(',', '.');
+  }
+  const valor = parseFloat(limpo);
   return Number.isFinite(valor) ? Math.round(valor * 100) : null;
 }
 
@@ -25,10 +32,17 @@ function parseData(texto: string): string | null {
   const t = texto.trim();
   if (!t) return null;
   if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
-  const match = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  const match = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (match) {
-    const [, dia, mes, ano] = match;
-    return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    const [, a, b, anoTexto] = match;
+    let dia = parseInt(a, 10);
+    let mes = parseInt(b, 10);
+    // Quando o "mês" extraído é >12, os campos estão trocados (formato MM/DD).
+    if (mes > 12 && dia <= 12) {
+      [dia, mes] = [mes, dia];
+    }
+    const ano = anoTexto.length === 2 ? 2000 + parseInt(anoTexto, 10) : parseInt(anoTexto, 10);
+    return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
   }
   return null;
 }

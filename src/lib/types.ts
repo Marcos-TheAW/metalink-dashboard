@@ -32,7 +32,7 @@ export const CANAIS: { value: Canal; label: string }[] = [
   { value: 'presswhizz', label: 'PressWhizz' },
   { value: 'white_press', label: 'White Press' },
   { value: 'cliente_direto_br', label: 'Cliente Direto BR' },
-  { value: 'cliente_direto_intl', label: 'Cliente Direto Intl' }
+  { value: 'cliente_direto_intl', label: 'Cliente Direto Internacional' }
 ];
 
 export const STATUS_PEDIDO: { value: StatusPedido; label: string }[] = [
