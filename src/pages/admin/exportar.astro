@@ -1,0 +1,25 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const usuario = Astro.locals.usuario;
+
+// Checagem redundante: o middleware já retorna 403 para não-admins em /admin,
+// mas a página também nunca renderiza o link de download fora dessa condição.
+if (usuario.papel !== 'admin') {
+  return new Response('Acesso restrito a administradores.', { status: 403 });
+}
+---
+
+<Layout title="Exportar dados" usuario={usuario}>
+  <h1 class="mb-6">Exportar dados</h1>
+
+  <div class="card max-w-xl">
+    <p class="text-sm text-slate-600">
+      Gera um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com 3 abas
+      (Clientes, Pedidos, Ações Comerciais), usando os mesmos nomes e ordem de colunas da
+      planilha original. Esse arquivo é o plano B: se o dashboard falhar, ele pode ser colado
+      de volta no Google Sheets para continuar o fluxo sem perda de dado.
+    </p>
+    <a href="/api/admin/exportar" class="btn-primary mt-4 inline-flex">Baixar exportação .xlsx</a>
+  </div>
+</Layout>

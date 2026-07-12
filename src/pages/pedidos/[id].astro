@@ -1,0 +1,109 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ErrorBanner from '../../components/ErrorBanner.astro';
+import FormSelect from '../../components/FormSelect.astro';
+import { getPedido, listClientes, listHistorico, listUsuariosAtivos } from '../../lib/db';
+import { CANAIS, STATUS_PEDIDO } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const id = Number(Astro.params.id);
+const erro = Astro.url.searchParams.get('erro');
+
+const pedido = Number.isFinite(id) ? await getPedido(id) : null;
+
+if (!pedido) {
+  Astro.response.status = 404;
+}
+
+const [clientes, usuarios, historico] = pedido
+  ? await Promise.all([listClientes(), listUsuariosAtivos(), listHistorico('pedidos', id)])
+  : [[], [], []];
+
+const opcoesClientes = clientes.map((c) => ({ value: String(c.id), label: c.nome }));
+const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome }));
+---
+
+<Layout title={pedido ? `Pedido #${pedido.id}` : 'Pedido não encontrado'} usuario={usuario}>
+  {
+    !pedido ? (
+      <div class="card">Pedido não encontrado.</div>
+    ) : (
+      <>
+        <h1 class="mb-6">Pedido #{pedido.id}</h1>
+
+        <ErrorBanner mensagem={erro} />
+
+        <form method="post" action={`/api/pedidos/${pedido.id}`} class="card grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormSelect name="cliente_id" label="Cliente" options={opcoesClientes} value={String(pedido.cliente_id)} required />
+          <FormSelect name="canal" label="Canal de Origem" options={CANAIS} value={pedido.canal} required />
+
+          <div>
+            <label for="qtd_links">Qtd. de Links <span class="text-red-500">*</span></label>
+            <input type="number" id="qtd_links" name="qtd_links" min="1" step="1" value={pedido.qtd_links} required />
+          </div>
+
+          <div>
+            <label for="valor_reais">Valor Total (R$) <span class="text-red-500">*</span></label>
+            <input type="number" id="valor_reais" name="valor_reais" min="0.01" step="0.01" value={(pedido.valor_centavos / 100).toFixed(2)} required />
+          </div>
+
+          <div>
+            <label for="data_pedido">Data do Pedido <span class="text-red-500">*</span></label>
+            <input type="date" id="data_pedido" name="data_pedido" value={pedido.data_pedido} required />
+          </div>
+
+          <div>
+            <label for="prazo_entrega">Prazo de Entrega</label>
+            <input type="date" id="prazo_entrega" name="prazo_entrega" value={pedido.prazo_entrega ?? ''} />
+          </div>
+
+          <FormSelect name="status" label="Status do Pedido" options={STATUS_PEDIDO} value={pedido.status} required />
+          <FormSelect name="responsavel_id" label="Responsável" options={opcoesUsuarios} value={pedido.responsavel_id ? String(pedido.responsavel_id) : ''} placeholder="Sem responsável definido" />
+
+          <div class="sm:col-span-2">
+            <label for="link_detalhe">Link da Planilha de Detalhe</label>
+            <input type="url" id="link_detalhe" name="link_detalhe" value={pedido.link_detalhe ?? ''} placeholder="https://…" />
+          </div>
+
+          <div class="flex gap-3 sm:col-span-2">
+            <button type="submit" class="btn-primary">Salvar alterações</button>
+            <a href="/pedidos" class="btn-secondary">Voltar</a>
+          </div>
+        </form>
+
+        <section class="mt-8">
+          <h2 class="mb-3">Histórico de alterações</h2>
+          <div class="card overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Quando</th>
+                  <th>Usuário</th>
+                  <th>Campo</th>
+                  <th>De</th>
+                  <th>Para</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historico.map((h: any) => (
+                  <tr>
+                    <td>{h.criado_em}</td>
+                    <td>{h.usuario_nome ?? '—'}</td>
+                    <td>{h.campo}</td>
+                    <td>{h.valor_anterior ?? '—'}</td>
+                    <td>{h.valor_novo ?? '—'}</td>
+                  </tr>
+                ))}
+                {historico.length === 0 && (
+                  <tr>
+                    <td colspan="5" class="text-center text-slate-400">Nenhuma alteração registrada ainda.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </>
+    )
+  }
+</Layout>

@@ -1,0 +1,68 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ErrorBanner from '../../components/ErrorBanner.astro';
+import FormSelect from '../../components/FormSelect.astro';
+import { listClientes, listUsuariosAtivos } from '../../lib/db';
+import { CANAIS, STATUS_PEDIDO } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const erro = Astro.url.searchParams.get('erro');
+
+const [clientes, usuarios] = await Promise.all([listClientes(), listUsuariosAtivos()]);
+const opcoesClientes = clientes.map((c) => ({ value: String(c.id), label: c.nome }));
+const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome }));
+
+const hoje = new Date().toISOString().slice(0, 10);
+---
+
+<Layout title="Novo pedido" usuario={usuario}>
+  <h1 class="mb-6">Novo pedido</h1>
+
+  <ErrorBanner mensagem={erro} />
+
+  {
+    clientes.length === 0 ? (
+      <div class="card text-sm text-slate-600">
+        Nenhum cliente cadastrado ainda. <a href="/clientes" class="text-brand-600 hover:underline">Cadastre um cliente</a> antes de criar um pedido.
+      </div>
+    ) : (
+      <form method="post" action="/api/pedidos" class="card grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormSelect name="cliente_id" label="Cliente" options={opcoesClientes} required placeholder="Selecione o cliente" />
+        <FormSelect name="canal" label="Canal de Origem" options={CANAIS} required placeholder="Selecione o canal" />
+
+        <div>
+          <label for="qtd_links">Qtd. de Links <span class="text-red-500">*</span></label>
+          <input type="number" id="qtd_links" name="qtd_links" min="1" step="1" value="1" required />
+        </div>
+
+        <div>
+          <label for="valor_reais">Valor Total (R$) <span class="text-red-500">*</span></label>
+          <input type="number" id="valor_reais" name="valor_reais" min="0.01" step="0.01" required />
+        </div>
+
+        <div>
+          <label for="data_pedido">Data do Pedido <span class="text-red-500">*</span></label>
+          <input type="date" id="data_pedido" name="data_pedido" value={hoje} required />
+        </div>
+
+        <div>
+          <label for="prazo_entrega">Prazo de Entrega</label>
+          <input type="date" id="prazo_entrega" name="prazo_entrega" />
+        </div>
+
+        <FormSelect name="status" label="Status do Pedido" options={STATUS_PEDIDO} value="aguardando_producao" required />
+        <FormSelect name="responsavel_id" label="Responsável" options={opcoesUsuarios} placeholder="Sem responsável definido" />
+
+        <div class="sm:col-span-2">
+          <label for="link_detalhe">Link da Planilha de Detalhe</label>
+          <input type="url" id="link_detalhe" name="link_detalhe" placeholder="https://…" />
+        </div>
+
+        <div class="flex gap-3 sm:col-span-2">
+          <button type="submit" class="btn-primary">Salvar pedido</button>
+          <a href="/pedidos" class="btn-secondary">Cancelar</a>
+        </div>
+      </form>
+    )
+  }
+</Layout>

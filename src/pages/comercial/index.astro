@@ -1,0 +1,91 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import StatusBadge from '../../components/StatusBadge.astro';
+import { listAcoes, listClientes } from '../../lib/db';
+import { CANAIS_COMERCIAIS, RESULTADOS_ACAO, TIPOS_ACAO, labelFor } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const url = Astro.url;
+
+const tipo = url.searchParams.get('tipo') ?? '';
+const resultado = url.searchParams.get('resultado') ?? '';
+const clienteIdRaw = url.searchParams.get('cliente_id') ?? '';
+const clienteId = clienteIdRaw ? Number(clienteIdRaw) : undefined;
+
+const [acoes, clientes] = await Promise.all([
+  listAcoes({ tipo: tipo || undefined, resultado: resultado || undefined, cliente_id: clienteId }),
+  listClientes()
+]);
+---
+
+<Layout title="Ações Comerciais" usuario={usuario}>
+  <div class="mb-6 flex items-center justify-between">
+    <h1>Ações Comerciais</h1>
+    <a href="/comercial/novo" class="btn-primary">Nova ação</a>
+  </div>
+
+  <form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <div>
+      <label for="tipo">Tipo de Ação</label>
+      <select id="tipo" name="tipo">
+        <option value="">Todos</option>
+        {TIPOS_ACAO.map((t) => <option value={t.value} selected={t.value === tipo}>{t.label}</option>)}
+      </select>
+    </div>
+    <div>
+      <label for="resultado">Resultado</label>
+      <select id="resultado" name="resultado">
+        <option value="">Todos</option>
+        {RESULTADOS_ACAO.map((r) => <option value={r.value} selected={r.value === resultado}>{r.label}</option>)}
+      </select>
+    </div>
+    <div>
+      <label for="cliente_id">Cliente / Prospect</label>
+      <select id="cliente_id" name="cliente_id">
+        <option value="">Todos</option>
+        {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button type="submit" class="btn-secondary w-full">Filtrar</button>
+    </div>
+  </form>
+
+  <div class="card overflow-x-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Cliente / Prospect</th>
+          <th>Canal</th>
+          <th>Tipo</th>
+          <th>Resultado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          acoes.map((a) => (
+            <tr>
+              <td>
+                <a href={`/comercial/${a.id}`} class="font-medium text-brand-600 hover:underline">
+                  {a.data_acao}
+                </a>
+              </td>
+              <td>{a.cliente_nome}</td>
+              <td>{labelFor(CANAIS_COMERCIAIS, a.canal)}</td>
+              <td>{labelFor(TIPOS_ACAO, a.tipo)}</td>
+              <td>
+                <StatusBadge value={a.resultado} label={labelFor(RESULTADOS_ACAO, a.resultado)} />
+              </td>
+            </tr>
+          ))
+        }
+        {acoes.length === 0 && (
+          <tr>
+            <td colspan="5" class="text-center text-slate-400">Nenhuma ação encontrada para esses filtros.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</Layout>

@@ -1,0 +1,80 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ErrorBanner from '../../components/ErrorBanner.astro';
+import StatusBadge from '../../components/StatusBadge.astro';
+import { listClientesStatus } from '../../lib/db';
+import { STATUS_RELACIONAMENTO_LABEL, centavosParaReais, type StatusRelacionamento } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const erro = Astro.url.searchParams.get('erro');
+
+const clientes = await listClientesStatus();
+---
+
+<Layout title="Clientes" usuario={usuario}>
+  <h1 class="mb-6">Clientes</h1>
+
+  <ErrorBanner mensagem={erro} />
+
+  <details class="card mb-6">
+    <summary class="cursor-pointer text-sm font-medium text-slate-700">Cadastrar novo cliente</summary>
+    <form method="post" action="/api/clientes" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label for="nome">Nome do cliente <span class="text-red-500">*</span></label>
+        <input type="text" id="nome" name="nome" required />
+      </div>
+      <div>
+        <label for="observacao">Observação</label>
+        <input type="text" id="observacao" name="observacao" />
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" class="btn-primary">Cadastrar cliente</button>
+      </div>
+    </form>
+  </details>
+
+  <div class="card overflow-x-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Status</th>
+          <th>Último Pedido</th>
+          <th>Dias s/ Pedido</th>
+          <th>Último Contato</th>
+          <th>Dias s/ Contato</th>
+          <th>Total Pedidos</th>
+          <th>Receita Total</th>
+          <th>Key Account</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          clientes.map((c) => (
+            <tr>
+              <td class="font-medium text-slate-900">{c.nome}</td>
+              <td>
+                <StatusBadge
+                  value={c.status_relacionamento}
+                  label={STATUS_RELACIONAMENTO_LABEL[c.status_relacionamento as StatusRelacionamento]}
+                />
+              </td>
+              <td>{c.ultimo_pedido ?? '—'}</td>
+              <td>{c.dias_sem_pedido ?? '—'}</td>
+              <td>{c.ultimo_contato ?? '—'}</td>
+              <td>{c.dias_sem_contato ?? '—'}</td>
+              <td>{c.total_pedidos}</td>
+              <td>{centavosParaReais(c.receita_total_centavos)}</td>
+              <td>{c.key_account ? '✓' : ''}</td>
+            </tr>
+          ))
+        }
+        {clientes.length === 0 && (
+          <tr>
+            <td colspan="9" class="text-center text-slate-400">Nenhum cliente cadastrado ainda.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</Layout>

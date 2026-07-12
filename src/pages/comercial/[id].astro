@@ -1,0 +1,95 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ErrorBanner from '../../components/ErrorBanner.astro';
+import FormSelect from '../../components/FormSelect.astro';
+import { getAcao, listClientes, listHistorico, listUsuariosAtivos } from '../../lib/db';
+import { CANAIS_COMERCIAIS, RESULTADOS_ACAO, TIPOS_ACAO } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const id = Number(Astro.params.id);
+const erro = Astro.url.searchParams.get('erro');
+
+const acao = Number.isFinite(id) ? await getAcao(id) : null;
+
+if (!acao) {
+  Astro.response.status = 404;
+}
+
+const [clientes, usuarios, historico] = acao
+  ? await Promise.all([listClientes(), listUsuariosAtivos(), listHistorico('acoes_comerciais', id)])
+  : [[], [], []];
+
+const opcoesClientes = clientes.map((c) => ({ value: String(c.id), label: c.nome }));
+const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome }));
+---
+
+<Layout title={acao ? `Ação #${acao.id}` : 'Ação não encontrada'} usuario={usuario}>
+  {
+    !acao ? (
+      <div class="card">Ação comercial não encontrada.</div>
+    ) : (
+      <>
+        <h1 class="mb-6">Ação comercial #{acao.id}</h1>
+
+        <ErrorBanner mensagem={erro} />
+
+        <form method="post" action={`/api/comercial/${acao.id}`} class="card grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormSelect name="cliente_id" label="Cliente / Prospect" options={opcoesClientes} value={String(acao.cliente_id)} required />
+          <FormSelect name="canal" label="Canal" options={CANAIS_COMERCIAIS} value={acao.canal} required />
+          <FormSelect name="tipo" label="Tipo de Ação" options={TIPOS_ACAO} value={acao.tipo} required />
+          <FormSelect name="resultado" label="Resultado" options={RESULTADOS_ACAO} value={acao.resultado} required />
+
+          <div>
+            <label for="data_acao">Data da Ação <span class="text-red-500">*</span></label>
+            <input type="date" id="data_acao" name="data_acao" value={acao.data_acao} required />
+          </div>
+
+          <FormSelect name="responsavel_id" label="Responsável" options={opcoesUsuarios} value={acao.responsavel_id ? String(acao.responsavel_id) : ''} placeholder="Sem responsável definido" />
+
+          <div class="sm:col-span-2">
+            <label for="observacoes">Observações</label>
+            <textarea id="observacoes" name="observacoes" rows="3">{acao.observacoes ?? ''}</textarea>
+          </div>
+
+          <div class="flex gap-3 sm:col-span-2">
+            <button type="submit" class="btn-primary">Salvar alterações</button>
+            <a href="/comercial" class="btn-secondary">Voltar</a>
+          </div>
+        </form>
+
+        <section class="mt-8">
+          <h2 class="mb-3">Histórico de alterações</h2>
+          <div class="card overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Quando</th>
+                  <th>Usuário</th>
+                  <th>Campo</th>
+                  <th>De</th>
+                  <th>Para</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historico.map((h: any) => (
+                  <tr>
+                    <td>{h.criado_em}</td>
+                    <td>{h.usuario_nome ?? '—'}</td>
+                    <td>{h.campo}</td>
+                    <td>{h.valor_anterior ?? '—'}</td>
+                    <td>{h.valor_novo ?? '—'}</td>
+                  </tr>
+                ))}
+                {historico.length === 0 && (
+                  <tr>
+                    <td colspan="5" class="text-center text-slate-400">Nenhuma alteração registrada ainda.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </>
+    )
+  }
+</Layout>

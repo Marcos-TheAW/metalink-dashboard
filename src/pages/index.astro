@@ -1,0 +1,166 @@
+---
+import Layout from '../layouts/Layout.astro';
+import KpiCard from '../components/KpiCard.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import {
+  getExecucaoComercial,
+  getKpisGerais,
+  getKpisPorCanal,
+  getKpisPorMes,
+  getRetencaoClientes
+} from '../lib/db';
+import {
+  CANAIS,
+  RESULTADOS_ACAO,
+  STATUS_RELACIONAMENTO_LABEL,
+  TIPOS_ACAO,
+  centavosParaReais,
+  labelFor,
+  type StatusRelacionamento
+} from '../lib/types';
+
+const usuario = Astro.locals.usuario;
+
+const [kpis, porCanal, porMes, retencao, execucao] = await Promise.all([
+  getKpisGerais(),
+  getKpisPorCanal(),
+  getKpisPorMes(),
+  getRetencaoClientes(),
+  getExecucaoComercial()
+]);
+
+const ordemStatus: StatusRelacionamento[] = ['ativo', 'em_risco', 'perdido', 'nunca_comprou'];
+const retencaoMap = new Map(retencao.map((r) => [r.status_relacionamento, r.total]));
+---
+
+<Layout title="Dashboard" usuario={usuario}>
+  <div class="mb-6 flex items-center justify-between">
+    <h1>Dashboard</h1>
+  </div>
+
+  <section class="grid grid-cols-2 gap-4 md:grid-cols-4">
+    <KpiCard label="Receita total" value={centavosParaReais(kpis.receita_total_centavos)} hint={`${kpis.total_pedidos} pedidos`} />
+    <KpiCard label="Ticket médio" value={centavosParaReais(kpis.ticket_medio_centavos)} />
+    <KpiCard
+      label="Taxa de conversão comercial"
+      value={`${(kpis.taxa_conversao * 100).toFixed(1)}%`}
+      hint={`${kpis.acoes_convertidas} de ${kpis.total_acoes} ações`}
+    />
+    <KpiCard label="Receita em risco" value={centavosParaReais(kpis.receita_em_risco_centavos)} hint="Clientes em risco ou perdidos" />
+  </section>
+
+  <section class="mt-8 grid gap-6 lg:grid-cols-2">
+    <div class="card">
+      <h2>Receita por canal</h2>
+      <table class="mt-3">
+        <thead>
+          <tr>
+            <th>Canal</th>
+            <th>Pedidos</th>
+            <th>Receita</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            porCanal.map((row) => (
+              <tr>
+                <td>{labelFor(CANAIS, row.canal)}</td>
+                <td>{row.total_pedidos}</td>
+                <td>{centavosParaReais(row.receita_centavos)}</td>
+              </tr>
+            ))
+          }
+          {porCanal.length === 0 && (
+            <tr>
+              <td colspan="3" class="text-center text-slate-400">Nenhum pedido registrado ainda.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Retenção de clientes</h2>
+      <table class="mt-3">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Clientes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            ordemStatus.map((status) => (
+              <tr>
+                <td>
+                  <StatusBadge value={status} label={STATUS_RELACIONAMENTO_LABEL[status]} />
+                </td>
+                <td>{retencaoMap.get(status) ?? 0}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mt-6 card">
+    <h2>Receita mensal</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          <th>Mês</th>
+          <th>Pedidos</th>
+          <th>Receita</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          porMes.map((row) => (
+            <tr>
+              <td>{row.mes}</td>
+              <td>{row.total_pedidos}</td>
+              <td>{centavosParaReais(row.receita_centavos)}</td>
+            </tr>
+          ))
+        }
+        {porMes.length === 0 && (
+          <tr>
+            <td colspan="3" class="text-center text-slate-400">Nenhum pedido registrado ainda.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="mt-6 card">
+    <h2>Execução comercial (tipo × resultado)</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          <th>Tipo de ação</th>
+          <th>Resultado</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          execucao.map((row) => (
+            <tr>
+              <td>{labelFor(TIPOS_ACAO, row.tipo)}</td>
+              <td>
+                <StatusBadge value={row.resultado} label={labelFor(RESULTADOS_ACAO, row.resultado)} />
+              </td>
+              <td>{row.total}</td>
+            </tr>
+          ))
+        }
+        {execucao.length === 0 && (
+          <tr>
+            <td colspan="3" class="text-center text-slate-400">Nenhuma ação comercial registrada ainda.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </section>
+</Layout>

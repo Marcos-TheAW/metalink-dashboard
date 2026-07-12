@@ -1,0 +1,67 @@
+---
+import '../styles/global.css';
+import type { Usuario } from '../lib/types';
+
+interface Props {
+  title: string;
+  usuario: Usuario;
+}
+
+const { title, usuario } = Astro.props;
+
+const links = [
+  { href: '/', label: 'Dashboard' },
+  { href: '/pedidos', label: 'Pedidos' },
+  { href: '/comercial', label: 'Ações Comerciais' },
+  { href: '/clientes', label: 'Clientes' }
+];
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} · Metalink Dashboard</title>
+  </head>
+  <body>
+    <div class="min-h-screen">
+      <header class="border-b border-slate-200 bg-white">
+        <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+          <div class="flex items-center gap-8">
+            <span class="text-sm font-bold tracking-tight text-brand-600">metalink dashboard</span>
+            <nav class="flex gap-1">
+              {
+                links.map((link) => (
+                  <a
+                    href={link.href}
+                    class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  >
+                    {link.label}
+                  </a>
+                ))
+              }
+              {
+                usuario.papel === 'admin' && (
+                  <a
+                    href="/admin/exportar"
+                    class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  >
+                    Exportar
+                  </a>
+                )
+              }
+            </nav>
+          </div>
+          <div class="text-right text-xs text-slate-500">
+            <div class="font-medium text-slate-700">{usuario.nome}</div>
+            <div>{usuario.papel === 'admin' ? 'Administrador' : 'Colaborador'}</div>
+          </div>
+        </div>
+      </header>
+      <main class="mx-auto max-w-6xl px-6 py-8">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>

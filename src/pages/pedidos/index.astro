@@ -1,0 +1,93 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import StatusBadge from '../../components/StatusBadge.astro';
+import { listClientes, listPedidos } from '../../lib/db';
+import { CANAIS, STATUS_PEDIDO, centavosParaReais, labelFor } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const url = Astro.url;
+
+const status = url.searchParams.get('status') ?? '';
+const canal = url.searchParams.get('canal') ?? '';
+const clienteIdRaw = url.searchParams.get('cliente_id') ?? '';
+const clienteId = clienteIdRaw ? Number(clienteIdRaw) : undefined;
+
+const [pedidos, clientes] = await Promise.all([
+  listPedidos({ status: status || undefined, canal: canal || undefined, cliente_id: clienteId }),
+  listClientes()
+]);
+---
+
+<Layout title="Pedidos" usuario={usuario}>
+  <div class="mb-6 flex items-center justify-between">
+    <h1>Pedidos</h1>
+    <a href="/pedidos/novo" class="btn-primary">Novo pedido</a>
+  </div>
+
+  <form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <div>
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">Todos</option>
+        {STATUS_PEDIDO.map((s) => <option value={s.value} selected={s.value === status}>{s.label}</option>)}
+      </select>
+    </div>
+    <div>
+      <label for="canal">Canal</label>
+      <select id="canal" name="canal">
+        <option value="">Todos</option>
+        {CANAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
+      </select>
+    </div>
+    <div>
+      <label for="cliente_id">Cliente</label>
+      <select id="cliente_id" name="cliente_id">
+        <option value="">Todos</option>
+        {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button type="submit" class="btn-secondary w-full">Filtrar</button>
+    </div>
+  </form>
+
+  <div class="card overflow-x-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Cliente</th>
+          <th>Canal</th>
+          <th>Links</th>
+          <th>Valor</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          pedidos.map((p) => (
+            <tr>
+              <td>
+                <a href={`/pedidos/${p.id}`} class="font-medium text-brand-600 hover:underline">
+                  {p.data_pedido}
+                </a>
+              </td>
+              <td>{p.cliente_nome}</td>
+              <td>{labelFor(CANAIS, p.canal)}</td>
+              <td>{p.qtd_links}</td>
+              <td>{centavosParaReais(p.valor_centavos)}</td>
+              <td>
+                <StatusBadge value={p.status} label={labelFor(STATUS_PEDIDO, p.status)} />
+              </td>
+            </tr>
+          ))
+        }
+        {pedidos.length === 0 && (
+          <tr>
+            <td colspan="6" class="text-center text-slate-400">Nenhum pedido encontrado para esses filtros.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</Layout>

@@ -1,0 +1,54 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ErrorBanner from '../../components/ErrorBanner.astro';
+import FormSelect from '../../components/FormSelect.astro';
+import { listClientes, listUsuariosAtivos } from '../../lib/db';
+import { CANAIS_COMERCIAIS, RESULTADOS_ACAO, TIPOS_ACAO } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const erro = Astro.url.searchParams.get('erro');
+
+const [clientes, usuarios] = await Promise.all([listClientes(), listUsuariosAtivos()]);
+const opcoesClientes = clientes.map((c) => ({ value: String(c.id), label: c.nome }));
+const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome }));
+
+const hoje = new Date().toISOString().slice(0, 10);
+---
+
+<Layout title="Nova ação comercial" usuario={usuario}>
+  <h1 class="mb-6">Nova ação comercial</h1>
+
+  <ErrorBanner mensagem={erro} />
+
+  {
+    clientes.length === 0 ? (
+      <div class="card text-sm text-slate-600">
+        Nenhum cliente/prospect cadastrado ainda. <a href="/clientes" class="text-brand-600 hover:underline">Cadastre um cliente</a> antes de registrar uma ação.
+      </div>
+    ) : (
+      <form method="post" action="/api/comercial" class="card grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormSelect name="cliente_id" label="Cliente / Prospect" options={opcoesClientes} required placeholder="Selecione o cliente" />
+        <FormSelect name="canal" label="Canal" options={CANAIS_COMERCIAIS} required placeholder="Selecione o canal" />
+        <FormSelect name="tipo" label="Tipo de Ação" options={TIPOS_ACAO} required placeholder="Selecione o tipo" />
+        <FormSelect name="resultado" label="Resultado" options={RESULTADOS_ACAO} value="em_andamento" required />
+
+        <div>
+          <label for="data_acao">Data da Ação <span class="text-red-500">*</span></label>
+          <input type="date" id="data_acao" name="data_acao" value={hoje} required />
+        </div>
+
+        <FormSelect name="responsavel_id" label="Responsável" options={opcoesUsuarios} placeholder="Sem responsável definido" />
+
+        <div class="sm:col-span-2">
+          <label for="observacoes">Observações</label>
+          <textarea id="observacoes" name="observacoes" rows="3"></textarea>
+        </div>
+
+        <div class="flex gap-3 sm:col-span-2">
+          <button type="submit" class="btn-primary">Salvar ação</button>
+          <a href="/comercial" class="btn-secondary">Cancelar</a>
+        </div>
+      </form>
+    )
+  }
+</Layout>
