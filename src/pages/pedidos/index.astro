@@ -101,37 +101,37 @@ const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div>
         <label>Quantidade de Links</label>
         <div class="mt-1 flex items-center gap-2">
-          <input type="number" name="qtd_links_min" min="0" placeholder="De" value={qtdLinksMin ?? ''} class="mt-0" />
-          <span class="text-slate-500">–</span>
-          <input type="number" name="qtd_links_max" min="0" placeholder="Até" value={qtdLinksMax ?? ''} class="mt-0" />
+          <input type="number" name="qtd_links_min" min="0" placeholder="De" value={qtdLinksMin ?? ''} class="mt-0 w-full min-w-0" />
+          <span class="shrink-0 text-slate-500">–</span>
+          <input type="number" name="qtd_links_max" min="0" placeholder="Até" value={qtdLinksMax ?? ''} class="mt-0 w-full min-w-0" />
         </div>
       </div>
       <div>
         <label>Valor Total (R$)</label>
         <div class="mt-1 flex items-center gap-2">
-          <input type="number" name="valor_min" min="0" step="0.01" placeholder="De" value={valorMinTexto} class="mt-0" />
-          <span class="text-slate-500">–</span>
-          <input type="number" name="valor_max" min="0" step="0.01" placeholder="Até" value={valorMaxTexto} class="mt-0" />
+          <input type="number" name="valor_min" min="0" step="0.01" placeholder="De" value={valorMinTexto} class="mt-0 w-full min-w-0" />
+          <span class="shrink-0 text-slate-500">–</span>
+          <input type="number" name="valor_max" min="0" step="0.01" placeholder="Até" value={valorMaxTexto} class="mt-0 w-full min-w-0" />
         </div>
       </div>
       <div>
         <label>Data do Pedido</label>
         <div class="mt-1 flex items-center gap-2">
-          <input type="date" name="data_inicio" value={dataInicio} class="mt-0" />
-          <span class="text-slate-500">–</span>
-          <input type="date" name="data_fim" value={dataFim} class="mt-0" />
+          <input type="date" name="data_inicio" value={dataInicio} class="mt-0 w-full min-w-0" />
+          <span class="shrink-0 text-slate-500">–</span>
+          <input type="date" name="data_fim" value={dataFim} class="mt-0 w-full min-w-0" />
         </div>
       </div>
       <div>
         <label>Prazo de Entrega</label>
         <div class="mt-1 flex items-center gap-2">
-          <input type="date" name="prazo_inicio" value={prazoInicio} class="mt-0" />
-          <span class="text-slate-500">–</span>
-          <input type="date" name="prazo_fim" value={prazoFim} class="mt-0" />
+          <input type="date" name="prazo_inicio" value={prazoInicio} class="mt-0 w-full min-w-0" />
+          <span class="shrink-0 text-slate-500">–</span>
+          <input type="date" name="prazo_fim" value={prazoFim} class="mt-0 w-full min-w-0" />
         </div>
       </div>
     </div>
