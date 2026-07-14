@@ -124,6 +124,13 @@ export interface Usuario {
   ativo: number;
 }
 
+export interface UsuarioCredenciais extends Usuario {
+  senha_hash: string | null;
+  senha_salt: string | null;
+  tentativas_falhas: number;
+  bloqueado_ate: string | null;
+}
+
 export interface Cliente {
   id: number;
   nome: string;

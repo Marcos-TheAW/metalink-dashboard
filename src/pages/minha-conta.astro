@@ -1,0 +1,65 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ErrorBanner from '../components/ErrorBanner.astro';
+import { definirSenha, getCredenciaisPorId } from '../lib/db';
+import { gerarHashSenha, verificarSenha } from '../lib/senha';
+
+const usuario = Astro.locals.usuario;
+
+let erro: string | null = null;
+let sucesso = false;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const senhaAtual = String(form.get('senha_atual') ?? '');
+  const novaSenha = String(form.get('nova_senha') ?? '');
+  const confirmacao = String(form.get('confirmacao') ?? '');
+
+  const credenciais = await getCredenciaisPorId(usuario.id);
+
+  if (!credenciais?.senha_hash || !credenciais.senha_salt || !(await verificarSenha(senhaAtual, credenciais.senha_hash, credenciais.senha_salt))) {
+    erro = 'Senha atual incorreta.';
+  } else if (novaSenha.length < 8) {
+    erro = 'A nova senha precisa ter pelo menos 8 caracteres.';
+  } else if (novaSenha !== confirmacao) {
+    erro = 'A confirmação não bate com a nova senha.';
+  } else {
+    const { hash, salt } = await gerarHashSenha(novaSenha);
+    await definirSenha(usuario.id, hash, salt);
+    sucesso = true;
+  }
+}
+---
+
+<Layout title="Minha Conta" usuario={usuario}>
+  <h1 class="mb-6">Minha Conta</h1>
+
+  <div class="card max-w-md">
+    <p class="text-sm text-slate-600">
+      <strong class="text-white">{usuario.nome}</strong> · {usuario.email}
+    </p>
+
+    <h2 class="mt-6">Trocar senha</h2>
+
+    <ErrorBanner mensagem={erro} />
+    {sucesso && <div class="mt-4 rounded-md border border-brand-500 bg-brand-500/10 px-4 py-3 text-sm text-white">Senha atualizada.</div>}
+
+    <form method="post" class="mt-4 flex flex-col gap-4">
+      <div>
+        <label for="senha_atual">Senha atual</label>
+        <input type="password" id="senha_atual" name="senha_atual" autocomplete="current-password" required />
+      </div>
+      <div>
+        <label for="nova_senha">Nova senha</label>
+        <input type="password" id="nova_senha" name="nova_senha" autocomplete="new-password" minlength="8" required />
+      </div>
+      <div>
+        <label for="confirmacao">Confirmar nova senha</label>
+        <input type="password" id="confirmacao" name="confirmacao" autocomplete="new-password" minlength="8" required />
+      </div>
+      <div>
+        <button type="submit" class="btn-primary">Salvar nova senha</button>
+      </div>
+    </form>
+  </div>
+</Layout>

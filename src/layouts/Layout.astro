@@ -22,50 +22,70 @@ const links = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+    <link rel="apple-touch-icon" href="/favicon-192.png" />
     <title>{title} · Metalink Dashboard</title>
   </head>
   <body>
     <div class="min-h-screen">
-      <header class="border-b border-slate-200 bg-white">
+      <header class="border-b border-slate-300 bg-slate-100">
         <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div class="flex items-center gap-8">
-            <span class="text-sm font-bold tracking-tight text-brand-600">metalink dashboard</span>
-            <nav class="flex gap-1">
-              {
-                links.map((link) => (
-                  <a
-                    href={link.href}
-                    class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    {link.label}
-                  </a>
-                ))
-              }
-              {
-                usuario.papel === 'admin' && (
-                  <a
-                    href="/admin/importar"
-                    class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    Importar
-                  </a>
-                )
-              }
-              {
-                usuario.papel === 'admin' && (
-                  <a
-                    href="/admin/exportar"
-                    class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    Exportar
-                  </a>
-                )
-              }
-            </nav>
-          </div>
-          <div class="text-right text-xs text-slate-500">
-            <div class="font-medium text-slate-700">{usuario.nome}</div>
-            <div>{usuario.papel === 'admin' ? 'Administrador' : 'Colaborador'}</div>
+          <nav class="flex gap-1">
+            {
+              links.map((link) => (
+                <a
+                  href={link.href}
+                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
+                >
+                  {link.label}
+                </a>
+              ))
+            }
+            {
+              usuario.papel === 'admin' && (
+                <a
+                  href="/admin/importar"
+                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
+                >
+                  Importar
+                </a>
+              )
+            }
+            {
+              usuario.papel === 'admin' && (
+                <a
+                  href="/admin/exportar"
+                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
+                >
+                  Exportar
+                </a>
+              )
+            }
+            {
+              usuario.papel === 'admin' && (
+                <a
+                  href="/admin/usuarios"
+                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
+                >
+                  Usuários
+                </a>
+              )
+            }
+          </nav>
+          <div class="flex items-center gap-4">
+            <div class="text-right text-xs text-slate-500">
+              <a href="/minha-conta" class="font-medium text-slate-700 hover:text-white hover:underline">
+                {usuario.nome}
+              </a>
+              <div>{usuario.papel === 'admin' ? 'Administrador' : 'Colaborador'}</div>
+            </div>
+            <form method="post" action="/api/logout">
+              <button type="submit" class="text-xs font-medium text-slate-500 hover:text-white hover:underline">
+                Sair
+              </button>
+            </form>
+            <img src="/logo.png" alt="Metalink" class="h-8 w-auto" />
           </div>
         </div>
       </header>

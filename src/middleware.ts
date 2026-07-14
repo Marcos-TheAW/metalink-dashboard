@@ -1,7 +1,7 @@
 import { defineMiddleware } from 'astro:middleware';
-import { resolveUsuario } from './lib/auth';
+import { getUsuarioPorId } from './lib/db';
 
-const ROTAS_PUBLICAS = ['/sem-acesso'];
+const ROTAS_PUBLICAS = ['/login', '/api/login'];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
@@ -10,12 +10,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (ROTAS_PUBLICAS.includes(pathname) || pathname.startsWith('/_')) {
     response = await next();
   } else {
-    const resolucao = await resolveUsuario(context.request);
+    const usuarioId = await context.session?.get('usuarioId');
+    const usuario = usuarioId ? await getUsuarioPorId(usuarioId) : null;
 
-    if (!resolucao.ok) {
-      response = context.redirect(`/sem-acesso?motivo=${resolucao.motivo}`);
+    if (!usuario) {
+      response = context.redirect('/login');
     } else {
-      const { usuario } = resolucao;
       context.locals.usuario = usuario;
 
       if ((pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) && usuario.papel !== 'admin') {

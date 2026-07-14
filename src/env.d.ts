@@ -4,4 +4,8 @@ declare namespace App {
   interface Locals {
     usuario: import('./lib/types').Usuario;
   }
+
+  interface SessionData {
+    usuarioId: number;
+  }
 }

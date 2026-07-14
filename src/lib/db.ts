@@ -4,8 +4,10 @@ import type {
   Cliente,
   ClienteStatus,
   KpisGerais,
+  Papel,
   Pedido,
-  Usuario
+  Usuario,
+  UsuarioCredenciais
 } from './types';
 
 export function db(): D1Database {
@@ -22,11 +24,83 @@ export async function getUsuarioPorEmail(email: string): Promise<Usuario | null>
   return row ?? null;
 }
 
+export async function getUsuarioPorId(id: number): Promise<Usuario | null> {
+  const row = await db().prepare('SELECT * FROM usuarios WHERE id = ? AND ativo = 1').bind(id).first<Usuario>();
+  return row ?? null;
+}
+
+export async function getCredenciaisPorEmail(email: string): Promise<UsuarioCredenciais | null> {
+  const row = await db()
+    .prepare('SELECT * FROM usuarios WHERE email = ?')
+    .bind(email)
+    .first<UsuarioCredenciais>();
+  return row ?? null;
+}
+
+export async function getCredenciaisPorId(id: number): Promise<UsuarioCredenciais | null> {
+  const row = await db().prepare('SELECT * FROM usuarios WHERE id = ?').bind(id).first<UsuarioCredenciais>();
+  return row ?? null;
+}
+
+export async function registrarTentativaFalha(id: number): Promise<void> {
+  await db()
+    .prepare(
+      `UPDATE usuarios
+          SET tentativas_falhas = tentativas_falhas + 1,
+              bloqueado_ate = CASE WHEN tentativas_falhas + 1 >= 5 THEN datetime('now', '+15 minutes') ELSE bloqueado_ate END
+        WHERE id = ?`
+    )
+    .bind(id)
+    .run();
+}
+
+export async function resetarTentativasFalha(id: number): Promise<void> {
+  await db()
+    .prepare(`UPDATE usuarios SET tentativas_falhas = 0, bloqueado_ate = NULL WHERE id = ?`)
+    .bind(id)
+    .run();
+}
+
+export async function definirSenha(id: number, hash: string, salt: string): Promise<void> {
+  await db()
+    .prepare(
+      `UPDATE usuarios SET senha_hash = ?, senha_salt = ?, tentativas_falhas = 0, bloqueado_ate = NULL WHERE id = ?`
+    )
+    .bind(hash, salt, id)
+    .run();
+}
+
 export async function listUsuariosAtivos(): Promise<Usuario[]> {
   const { results } = await db()
     .prepare('SELECT * FROM usuarios WHERE ativo = 1 ORDER BY nome')
     .all<Usuario>();
   return results;
+}
+
+export async function listUsuarios(): Promise<Usuario[]> {
+  const { results } = await db().prepare('SELECT * FROM usuarios ORDER BY nome').all<Usuario>();
+  return results;
+}
+
+export async function criarUsuario(
+  email: string,
+  nome: string,
+  papel: Papel,
+  senhaHash: string,
+  senhaSalt: string
+): Promise<number> {
+  const result = await db()
+    .prepare('INSERT INTO usuarios (email, nome, papel, senha_hash, senha_salt) VALUES (?, ?, ?, ?, ?)')
+    .bind(email.trim().toLowerCase(), nome, papel, senhaHash, senhaSalt)
+    .run();
+  return result.meta.last_row_id as number;
+}
+
+export async function atualizarUsuario(id: number, papel: Papel, ativo: boolean): Promise<void> {
+  await db()
+    .prepare('UPDATE usuarios SET papel = ?, ativo = ? WHERE id = ?')
+    .bind(papel, ativo ? 1 : 0, id)
+    .run();
 }
 
 // ---------- Clientes ----------

@@ -1,0 +1,166 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ErrorBanner from '../../components/ErrorBanner.astro';
+import { atualizarUsuario, criarUsuario, definirSenha, listUsuarios } from '../../lib/db';
+import { gerarHashSenha, gerarSenhaTemporaria } from '../../lib/senha';
+import type { Papel } from '../../lib/types';
+
+const usuarioLogado = Astro.locals.usuario;
+
+// Checagem redundante: o middleware já retorna 403 para não-admins em /admin.
+if (usuarioLogado.papel !== 'admin') {
+  return new Response('Acesso restrito a administradores.', { status: 403 });
+}
+
+let erro: string | null = null;
+let mensagemSucesso: string | null = null;
+let senhaGerada: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const acao = String(form.get('acao') ?? '');
+
+  try {
+    if (acao === 'criar') {
+      const email = String(form.get('email') ?? '').trim().toLowerCase();
+      const nome = String(form.get('nome') ?? '').trim();
+      const papel = String(form.get('papel') ?? '');
+
+      if (!email || !nome || (papel !== 'admin' && papel !== 'colaborador')) {
+        erro = 'Preencha e-mail, nome e papel corretamente.';
+      } else {
+        const senha = gerarSenhaTemporaria();
+        const { hash, salt } = await gerarHashSenha(senha);
+        await criarUsuario(email, nome, papel as Papel, hash, salt);
+        senhaGerada = senha;
+        mensagemSucesso = `Usuário ${email} cadastrado.`;
+      }
+    } else if (acao === 'atualizar') {
+      const id = Number(form.get('id'));
+      const papel = String(form.get('papel') ?? '');
+      const ativo = form.get('ativo') === '1';
+      if (Number.isFinite(id) && (papel === 'admin' || papel === 'colaborador')) {
+        await atualizarUsuario(id, papel as Papel, ativo);
+        mensagemSucesso = 'Usuário atualizado.';
+      }
+    } else if (acao === 'redefinir-senha') {
+      const id = Number(form.get('id'));
+      if (Number.isFinite(id)) {
+        const senha = gerarSenhaTemporaria();
+        const { hash, salt } = await gerarHashSenha(senha);
+        await definirSenha(id, hash, salt);
+        senhaGerada = senha;
+        mensagemSucesso = 'Senha redefinida.';
+      }
+    }
+  } catch (e) {
+    const texto = e instanceof Error ? e.message : String(e);
+    erro = texto.includes('UNIQUE') ? 'Já existe um usuário com esse e-mail.' : 'Falha ao processar a solicitação.';
+  }
+}
+
+const usuarios = await listUsuarios();
+---
+
+<Layout title="Usuários" usuario={usuarioLogado}>
+  <h1 class="mb-6">Usuários</h1>
+
+  <ErrorBanner mensagem={erro} />
+
+  {
+    mensagemSucesso && (
+      <div class="mb-6 rounded-md border border-brand-500 bg-brand-500/10 px-4 py-3 text-sm text-white">
+        <p>{mensagemSucesso}</p>
+        {senhaGerada && (
+          <p class="mt-2">
+            Senha temporária: <code class="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-white">{senhaGerada}</code>{' '}
+            — repasse com segurança; a pessoa pode trocar em "Minha Conta" depois de entrar.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  <details class="card mb-6">
+    <summary class="cursor-pointer text-sm font-medium text-slate-700">Cadastrar novo usuário</summary>
+    <form method="post" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <input type="hidden" name="acao" value="criar" />
+      <div>
+        <label for="email">E-mail</label>
+        <input type="email" id="email" name="email" required />
+      </div>
+      <div>
+        <label for="nome">Nome</label>
+        <input type="text" id="nome" name="nome" required />
+      </div>
+      <div>
+        <label for="papel">Papel</label>
+        <select id="papel" name="papel" required>
+          <option value="colaborador">Colaborador</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="sm:col-span-3">
+        <button type="submit" class="btn-primary">Cadastrar usuário</button>
+      </div>
+    </form>
+  </details>
+
+  <div class="card overflow-x-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>E-mail</th>
+          <th>Papel</th>
+          <th>Ativo</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          usuarios.map((u) => (
+            <tr>
+              <td>{u.nome}</td>
+              <td>{u.email}</td>
+              <td>{u.papel === 'admin' ? 'Admin' : 'Colaborador'}</td>
+              <td>{u.ativo ? 'Sim' : 'Não'}</td>
+              <td>
+                <form method="post" class="flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="acao" value="atualizar" />
+                  <input type="hidden" name="id" value={u.id} />
+                  <select name="papel" class="mt-0 w-auto py-1">
+                    <option value="colaborador" selected={u.papel === 'colaborador'}>
+                      Colaborador
+                    </option>
+                    <option value="admin" selected={u.papel === 'admin'}>
+                      Admin
+                    </option>
+                  </select>
+                  <label class="flex items-center gap-1 text-xs text-slate-600">
+                    <input type="checkbox" name="ativo" value="1" checked={!!u.ativo} class="mt-0 w-auto" />
+                    Ativo
+                  </label>
+                  <button type="submit" class="text-sm text-brand-500 hover:underline">
+                    Salvar
+                  </button>
+                </form>
+                <form method="post" class="mt-1">
+                  <input type="hidden" name="acao" value="redefinir-senha" />
+                  <input type="hidden" name="id" value={u.id} />
+                  <button
+                    type="submit"
+                    class="text-sm text-brand-500 hover:underline"
+                    onsubmit="return true"
+                  >
+                    Redefinir senha
+                  </button>
+                </form>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</Layout>

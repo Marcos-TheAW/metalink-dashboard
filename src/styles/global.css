@@ -1,16 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-500: #4f46e5;
-  --color-brand-600: #4338ca;
-  --color-brand-700: #3730a3;
+  /* Marca Metalink */
+  --color-brand-50: #e6faf3;
+  --color-brand-100: #c3f3e2;
+  --color-brand-500: #19cb96;
+  --color-brand-600: #14a97c;
+  --color-brand-700: #0f8863;
+
+  /* Tema escuro da marca: a escala "slate" do Tailwind é redefinida aqui,
+     então toda classe que já usa slate (bg, text, border) nas páginas
+     passa a refletir a nova paleta sem precisar tocar em cada arquivo. */
+  --color-slate-50: #1e2641; /* fundo da página */
+  --color-slate-100: #262f52; /* superfície: cards, cabeçalho, inputs */
+  --color-slate-200: #333d69; /* borda sutil (divisórias de tabela) */
+  --color-slate-300: #454f80; /* borda padrão (cards, inputs, cabeçalho) */
+  --color-slate-400: #8791ba; /* texto apagado (placeholder, estado vazio) */
+  --color-slate-500: #aab2d4; /* texto secundário/legenda */
+  --color-slate-600: #dde1f2; /* texto de corpo */
+  --color-slate-700: #ffffff; /* rótulos e texto primário */
+  --color-slate-900: #ffffff; /* títulos */
 }
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-slate-50 text-slate-700 antialiased;
   }
 
   h1 {
@@ -28,7 +42,7 @@
   input,
   select,
   textarea {
-    @apply mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    @apply mt-1 block w-full rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
   }
 
   table {
@@ -36,11 +50,15 @@
   }
 
   th {
-    @apply border-b border-slate-200 bg-slate-100 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+    @apply border-b border-brand-700 bg-brand-500 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white;
   }
 
   td {
-    @apply border-b border-slate-100 px-3 py-2 text-slate-700;
+    @apply border-b border-slate-200 px-3 py-2 text-slate-600;
+  }
+
+  code {
+    @apply text-slate-900;
   }
 }
 
@@ -50,22 +68,22 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow-sm transition-colors border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow-sm transition-colors bg-brand-500 text-white hover:bg-brand-600;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow-sm transition-colors border border-red-200 bg-white text-red-600 hover:bg-red-50;
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow-sm transition-colors border border-red-400 bg-transparent text-red-400 hover:bg-red-500 hover:text-white;
   }
 
   .link-danger {
-    @apply text-red-600 hover:underline;
+    @apply text-red-400 hover:underline;
   }
 
   .card {
-    @apply rounded-lg border border-slate-200 bg-white p-5 shadow-sm;
+    @apply rounded-lg border border-slate-300 bg-slate-100 p-5 shadow-sm;
   }
 
   .field-error {
-    @apply mt-1 text-xs text-red-600;
+    @apply mt-1 text-xs text-red-400;
   }
 }

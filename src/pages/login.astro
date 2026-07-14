@@ -1,0 +1,49 @@
+---
+import '../styles/global.css';
+
+const erro = Astro.url.searchParams.get('erro');
+const mensagensErro: Record<string, string> = {
+  invalido: 'E-mail ou senha inválidos.',
+  bloqueado: 'Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.',
+  inativo: 'Sua conta está desativada. Fale com um administrador.'
+};
+const mensagem = erro ? (mensagensErro[erro] ?? 'Não foi possível entrar.') : null;
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <title>Entrar · Metalink Dashboard</title>
+  </head>
+  <body>
+    <div class="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+      <div class="card w-full max-w-sm">
+        <div class="mb-6 flex justify-center">
+          <img src="/logo.png" alt="Metalink" class="h-10 w-auto" />
+        </div>
+        <h1 class="text-center">Entrar</h1>
+        {
+          mensagem && (
+            <div class="mt-4 rounded-md border border-red-400 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {mensagem}
+            </div>
+          )
+        }
+        <form method="post" action="/api/login" class="mt-6 flex flex-col gap-4">
+          <div>
+            <label for="email">E-mail</label>
+            <input type="email" id="email" name="email" autocomplete="username" required />
+          </div>
+          <div>
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" name="senha" autocomplete="current-password" required />
+          </div>
+          <button type="submit" class="btn-primary mt-2">Entrar</button>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
