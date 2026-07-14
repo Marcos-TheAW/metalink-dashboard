@@ -52,7 +52,34 @@ const clientes = await listClientesStatus();
         {
           clientes.map((c) => (
             <tr>
-              <td class="font-medium text-slate-900">{c.nome}</td>
+              <td class="font-medium text-slate-900">
+                <div class="flex items-center gap-1">
+                  <span>{c.nome}</span>
+                  <details class="relative">
+                    <summary
+                      class="cursor-pointer list-none rounded px-1.5 py-0.5 leading-none text-slate-400 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                      aria-label="Opções do cliente"
+                    >
+                      ⋮
+                    </summary>
+                    <div class="absolute left-0 z-10 mt-1 w-64 rounded-md border border-slate-300 bg-slate-100 p-3 shadow-lg">
+                      <form method="post" action={`/api/clientes/${c.id}`} class="flex flex-col gap-2">
+                        <div>
+                          <label for={`nome-${c.id}`}>Nome do cliente</label>
+                          <input type="text" id={`nome-${c.id}`} name="nome" value={c.nome} required />
+                        </div>
+                        <div>
+                          <label for={`observacao-${c.id}`}>Observação</label>
+                          <input type="text" id={`observacao-${c.id}`} name="observacao" value={c.observacao ?? ''} />
+                        </div>
+                        <button type="submit" class="btn-primary mt-1">
+                          Salvar
+                        </button>
+                      </form>
+                    </div>
+                  </details>
+                </div>
+              </td>
               <td>
                 <StatusBadge
                   value={c.status_relacionamento}

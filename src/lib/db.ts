@@ -123,6 +123,26 @@ export async function criarCliente(nome: string, observacao: string | null): Pro
   return result.meta.last_row_id as number;
 }
 
+export async function atualizarCliente(
+  id: number,
+  nome: string,
+  observacao: string | null,
+  usuarioId: number
+): Promise<void> {
+  const atual = await getCliente(id);
+  if (!atual) throw new Error('Cliente não encontrado');
+
+  await db().prepare('UPDATE clientes SET nome = ?, observacao = ? WHERE id = ?').bind(nome, observacao, id).run();
+
+  await registrarHistorico(
+    'clientes',
+    id,
+    usuarioId,
+    atual as unknown as Record<string, unknown>,
+    { nome, observacao } as unknown as Record<string, unknown>
+  );
+}
+
 export async function listClientesStatus(): Promise<ClienteStatus[]> {
   const { results } = await db()
     .prepare('SELECT * FROM v_clientes_status ORDER BY nome')

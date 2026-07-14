@@ -92,12 +92,13 @@ functions rather than writing raw SQL inline.
 
 ### Historico (audit trail) is written by the API layer, not the DB layer implicitly
 
-`pedidos` and `acoes_comerciais` edits must produce rows in `historico_alteracoes` (one row per changed
-field, old/new value as text). This happens inside `atualizarPedido`/`atualizarAcao` in `src/lib/db.ts`
-via the private `registrarHistorico` diff helper — it compares the fetched "before" row against the
-submitted input field-by-field and only inserts rows for fields that actually changed. `clientes` has no
-edit flow (create-only) and therefore no historico entries; don't add update logic for clientes without
-also deciding whether it needs history tracking.
+`pedidos`, `acoes_comerciais`, and `clientes` edits all produce rows in `historico_alteracoes` (one row
+per changed field, old/new value as text). This happens inside `atualizarPedido`/`atualizarAcao`/
+`atualizarCliente` in `src/lib/db.ts` via the private `registrarHistorico` diff helper — it compares the
+fetched "before" row against the submitted input field-by-field and only inserts rows for fields that
+actually changed. `clientes` editing is nome/observacao only, triggered from a small `<details>` popover
+next to the name on `/clientes` (no dedicated detail page, no historico *display* anywhere yet — the
+rows are recorded but nothing reads them back for clientes today).
 
 ### Request flow: plain HTML forms → API routes → redirect
 
