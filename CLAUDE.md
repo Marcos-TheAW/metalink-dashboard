@@ -52,16 +52,33 @@ functions. The `Env` type (currently `{ DB: D1Database; ASSETS: Fetcher }`) is g
 `worker-configuration.d.ts` by `wrangler types` / the build process; that file is gitignored and
 regenerated automatically, don't hand-edit it.
 
-### Auth: Cloudflare Access, no local login
+### Auth: own email/password login, session via Astro Sessions
 
-There is no username/password. `src/middleware.ts` reads the `Cf-Access-Authenticated-User-Email`
-header (injected by Cloudflare Access at the edge) via `src/lib/auth.ts#resolveUsuario`, looks the email
-up in the `usuarios` D1 table, and attaches the row to `Astro.locals.usuario` (typed in `src/env.d.ts`).
-No header/no matching active user → redirect to `/sem-acesso`. `papel` is `'admin' | 'colaborador'`;
-`/admin/*` and `/api/admin/*` are blocked for non-admins in the middleware, and `/admin/exportar` +
-`/api/admin/exportar.ts` each re-check `locals.usuario.papel === 'admin'` server-side as defense in
-depth. In local dev, Cloudflare Access isn't in front of you — fake it by sending the header yourself,
-e.g. `curl -H "Cf-Access-Authenticated-User-Email: you@example.com" http://localhost:4321/`.
+No Cloudflare Access — that was the original design but was replaced with a self-hosted login because
+Access required team members to have/use a Cloudflare account to sign in. `/login` posts to
+`/api/login`, which calls `src/lib/auth.ts#autenticar(email, senha)`: looks up `usuarios` by email
+(`src/lib/db.ts#getCredenciaisPorEmail`, including inactive/unset-password rows so it can give an
+accurate reason), verifies the password with `src/lib/senha.ts#verificarSenha` (PBKDF2-SHA256, 100k
+iterations, per-user random salt — both columns live on `usuarios.senha_hash`/`senha_salt`, added in
+`migrations/0005_auth_senha.sql`), and on success stores `usuarioId` in the session
+(`session.set('usuarioId', ...)` after `session.regenerate()`). `src/middleware.ts` reads
+`context.session.get('usuarioId')` on every request, loads the user via `getUsuarioPorId`, and attaches
+it to `Astro.locals.usuario` (typed in `src/env.d.ts`, along with `App.SessionData`). No valid session →
+redirect to `/login`. `papel` is `'admin' | 'colaborador'`; `/admin/*` and `/api/admin/*` are blocked
+for non-admins in the middleware, and `/admin/exportar` + `/api/admin/exportar.ts` each re-check
+`locals.usuario.papel === 'admin'` server-side as defense in depth.
+
+Sessions are backed by the Cloudflare KV namespace the `@astrojs/cloudflare` adapter auto-provisions
+(you'll see "Enabling sessions with Cloudflare KV" in build/dev output) — there was no extra binding to
+wire up for this. Five failed logins in a row locks the account for 15 minutes
+(`usuarios.tentativas_falhas` / `bloqueado_ate`, reset on success). `/admin/usuarios` (admin-only) is
+where new users get created and passwords get reset — it generates a random temporary password shown
+once in the response (never emailed; there's no outbound email integration), and the user changes it
+themselves at `/minha-conta`. There's no self-serve "forgot password" flow — that's on-purpose scope
+cut for an internal tool with a handful of users; an admin resets it manually if someone gets locked out
+or forgets. In local dev there's nothing special to fake — just seed a `usuarios` row with a known
+`senha_hash`/`senha_salt` pair (see git history around the 0005 migration for a one-off Node snippet
+that derives them with the same PBKDF2 params) and log in through `/login` normally.
 
 ### Business rules live in SQL views, not stored columns
 
