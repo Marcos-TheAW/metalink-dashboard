@@ -294,11 +294,23 @@ export interface FiltrosPedidos {
   status?: string;
   canal?: string;
   cliente_id?: number;
+  semana?: string;
+  qtdLinksMin?: number;
+  qtdLinksMax?: number;
+  valorMinCentavos?: number;
+  valorMaxCentavos?: number;
+  dataInicio?: string;
+  dataFim?: string;
+  prazoInicio?: string;
+  prazoFim?: string;
 }
 
 export interface PedidoComCliente extends Pedido {
   cliente_nome: string;
 }
+
+const SEGUNDA_FEIRA_SQL = (coluna: string) =>
+  `date(${coluna}, '-' || ((CAST(strftime('%w', ${coluna}) AS INTEGER) + 6) % 7) || ' days')`;
 
 export async function listPedidos(filtros: FiltrosPedidos = {}): Promise<PedidoComCliente[]> {
   const clauses: string[] = [];
@@ -315,6 +327,42 @@ export async function listPedidos(filtros: FiltrosPedidos = {}): Promise<PedidoC
     clauses.push('p.cliente_id = ?');
     params.push(filtros.cliente_id);
   }
+  if (filtros.semana) {
+    clauses.push(`${SEGUNDA_FEIRA_SQL('p.data_pedido')} = ?`);
+    params.push(filtros.semana);
+  }
+  if (filtros.qtdLinksMin !== undefined) {
+    clauses.push('p.qtd_links >= ?');
+    params.push(filtros.qtdLinksMin);
+  }
+  if (filtros.qtdLinksMax !== undefined) {
+    clauses.push('p.qtd_links <= ?');
+    params.push(filtros.qtdLinksMax);
+  }
+  if (filtros.valorMinCentavos !== undefined) {
+    clauses.push('p.valor_centavos >= ?');
+    params.push(filtros.valorMinCentavos);
+  }
+  if (filtros.valorMaxCentavos !== undefined) {
+    clauses.push('p.valor_centavos <= ?');
+    params.push(filtros.valorMaxCentavos);
+  }
+  if (filtros.dataInicio) {
+    clauses.push('p.data_pedido >= ?');
+    params.push(filtros.dataInicio);
+  }
+  if (filtros.dataFim) {
+    clauses.push('p.data_pedido <= ?');
+    params.push(filtros.dataFim);
+  }
+  if (filtros.prazoInicio) {
+    clauses.push('p.prazo_entrega >= ?');
+    params.push(filtros.prazoInicio);
+  }
+  if (filtros.prazoFim) {
+    clauses.push('p.prazo_entrega <= ?');
+    params.push(filtros.prazoFim);
+  }
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const { results } = await db()
     .prepare(
@@ -327,6 +375,17 @@ export async function listPedidos(filtros: FiltrosPedidos = {}): Promise<PedidoC
     .bind(...params)
     .all<PedidoComCliente>();
   return results;
+}
+
+export async function listSemanasPedidos(): Promise<string[]> {
+  const { results } = await db()
+    .prepare(
+      `SELECT DISTINCT ${SEGUNDA_FEIRA_SQL('data_pedido')} AS semana
+       FROM pedidos
+       ORDER BY semana DESC`
+    )
+    .all<{ semana: string }>();
+  return results.map((r) => r.semana);
 }
 
 export async function getPedido(id: number): Promise<Pedido | null> {

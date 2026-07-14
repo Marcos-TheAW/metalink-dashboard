@@ -1,8 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import BotaoExcluir from '../../components/BotaoExcluir.astro';
+import KpiCard from '../../components/KpiCard.astro';
 import StatusBadge from '../../components/StatusBadge.astro';
-import { listClientes, listPedidos } from '../../lib/db';
+import { listClientes, listPedidos, listSemanasPedidos } from '../../lib/db';
 import {
   CANAIS,
   STATUS_PEDIDO,
@@ -17,13 +18,49 @@ const url = Astro.url;
 
 const status = url.searchParams.get('status') ?? '';
 const canal = url.searchParams.get('canal') ?? '';
+const semana = url.searchParams.get('semana') ?? '';
 const clienteIdRaw = url.searchParams.get('cliente_id') ?? '';
 const clienteId = clienteIdRaw ? Number(clienteIdRaw) : undefined;
 
-const [pedidos, clientes] = await Promise.all([
-  listPedidos({ status: status || undefined, canal: canal || undefined, cliente_id: clienteId }),
-  listClientes()
+function paraNumero(valor: string | null): number | undefined {
+  if (!valor) return undefined;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+const qtdLinksMin = paraNumero(url.searchParams.get('qtd_links_min'));
+const qtdLinksMax = paraNumero(url.searchParams.get('qtd_links_max'));
+const valorMinTexto = url.searchParams.get('valor_min') ?? '';
+const valorMaxTexto = url.searchParams.get('valor_max') ?? '';
+const valorMinCentavos = valorMinTexto ? Math.round(Number(valorMinTexto) * 100) : undefined;
+const valorMaxCentavos = valorMaxTexto ? Math.round(Number(valorMaxTexto) * 100) : undefined;
+const dataInicio = url.searchParams.get('data_inicio') ?? '';
+const dataFim = url.searchParams.get('data_fim') ?? '';
+const prazoInicio = url.searchParams.get('prazo_inicio') ?? '';
+const prazoFim = url.searchParams.get('prazo_fim') ?? '';
+
+const [pedidos, clientes, semanas] = await Promise.all([
+  listPedidos({
+    status: status || undefined,
+    canal: canal || undefined,
+    cliente_id: clienteId,
+    semana: semana || undefined,
+    qtdLinksMin,
+    qtdLinksMax,
+    valorMinCentavos: valorMinCentavos !== undefined && Number.isFinite(valorMinCentavos) ? valorMinCentavos : undefined,
+    valorMaxCentavos: valorMaxCentavos !== undefined && Number.isFinite(valorMaxCentavos) ? valorMaxCentavos : undefined,
+    dataInicio: dataInicio || undefined,
+    dataFim: dataFim || undefined,
+    prazoInicio: prazoInicio || undefined,
+    prazoFim: prazoFim || undefined
+  }),
+  listClientes(),
+  listSemanasPedidos()
 ]);
+
+const totalPedidos = pedidos.length;
+const totalLinks = pedidos.reduce((soma, p) => soma + p.qtd_links, 0);
+const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 0);
 ---
 
 <Layout title="Pedidos" usuario={usuario}>
@@ -32,32 +69,84 @@ const [pedidos, clientes] = await Promise.all([
     <a href="/pedidos/novo" class="btn-primary">Novo pedido</a>
   </div>
 
-  <form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
-    <div>
-      <label for="status">Status</label>
-      <select id="status" name="status">
-        <option value="">Todos</option>
-        {STATUS_PEDIDO.map((s) => <option value={s.value} selected={s.value === status}>{s.label}</option>)}
-      </select>
+  <form method="get" class="card mb-6 flex flex-col gap-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+      <div>
+        <label for="semana">Semana (segunda)</label>
+        <select id="semana" name="semana">
+          <option value="">Todas</option>
+          {semanas.map((s) => <option value={s} selected={s === semana}>{formatarDataBR(s)}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="cliente_id">Cliente</label>
+        <select id="cliente_id" name="cliente_id">
+          <option value="">Todos</option>
+          {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="canal">Canal de Origem</label>
+        <select id="canal" name="canal">
+          <option value="">Todos</option>
+          {CANAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="status">Status do Pedido</label>
+        <select id="status" name="status">
+          <option value="">Todos</option>
+          {STATUS_PEDIDO.map((s) => <option value={s.value} selected={s.value === status}>{s.label}</option>)}
+        </select>
+      </div>
     </div>
-    <div>
-      <label for="canal">Canal</label>
-      <select id="canal" name="canal">
-        <option value="">Todos</option>
-        {CANAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
-      </select>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+      <div>
+        <label>Quantidade de Links</label>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="number" name="qtd_links_min" min="0" placeholder="De" value={qtdLinksMin ?? ''} class="mt-0" />
+          <span class="text-slate-500">–</span>
+          <input type="number" name="qtd_links_max" min="0" placeholder="Até" value={qtdLinksMax ?? ''} class="mt-0" />
+        </div>
+      </div>
+      <div>
+        <label>Valor Total (R$)</label>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="number" name="valor_min" min="0" step="0.01" placeholder="De" value={valorMinTexto} class="mt-0" />
+          <span class="text-slate-500">–</span>
+          <input type="number" name="valor_max" min="0" step="0.01" placeholder="Até" value={valorMaxTexto} class="mt-0" />
+        </div>
+      </div>
+      <div>
+        <label>Data do Pedido</label>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="date" name="data_inicio" value={dataInicio} class="mt-0" />
+          <span class="text-slate-500">–</span>
+          <input type="date" name="data_fim" value={dataFim} class="mt-0" />
+        </div>
+      </div>
+      <div>
+        <label>Prazo de Entrega</label>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="date" name="prazo_inicio" value={prazoInicio} class="mt-0" />
+          <span class="text-slate-500">–</span>
+          <input type="date" name="prazo_fim" value={prazoFim} class="mt-0" />
+        </div>
+      </div>
     </div>
-    <div>
-      <label for="cliente_id">Cliente</label>
-      <select id="cliente_id" name="cliente_id">
-        <option value="">Todos</option>
-        {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
-      </select>
-    </div>
-    <div class="flex items-end">
-      <button type="submit" class="btn-secondary w-full">Filtrar</button>
+
+    <div class="flex gap-3">
+      <button type="submit" class="btn-primary">Filtrar</button>
+      <a href="/pedidos" class="btn-secondary">Limpar filtros</a>
     </div>
   </form>
+
+  <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <KpiCard label="Pedidos (filtro atual)" value={String(totalPedidos)} />
+    <KpiCard label="Links (filtro atual)" value={String(totalLinks)} />
+    <KpiCard label="Valor total (filtro atual)" value={centavosParaReais(totalValorCentavos)} />
+  </section>
 
   <div class="card overflow-x-auto">
     <table>

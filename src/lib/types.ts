@@ -13,6 +13,7 @@ export type StatusPedido =
 export type CanalComercial = 'whatsapp' | 'email' | 'facebook';
 
 export type TipoAcao =
+  | 'follow_up'
   | 'follow_up_risco'
   | 'proposta_nova'
   | 'upsell_cross_sell'
@@ -51,6 +52,7 @@ export const CANAIS_COMERCIAIS: { value: CanalComercial; label: string }[] = [
 ];
 
 export const TIPOS_ACAO: { value: TipoAcao; label: string }[] = [
+  { value: 'follow_up', label: 'Follow-up' },
   { value: 'follow_up_risco', label: 'Follow-up Cliente em Risco' },
   { value: 'proposta_nova', label: 'Proposta Nova' },
   { value: 'upsell_cross_sell', label: 'Upsell / Cross-sell' },
