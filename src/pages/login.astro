@@ -41,6 +41,10 @@ const mensagem = erro ? (mensagensErro[erro] ?? 'Não foi possível entrar.') : 
             <label for="senha">Senha</label>
             <input type="password" id="senha" name="senha" autocomplete="current-password" required />
           </div>
+          <label class="flex items-center gap-2 text-sm font-normal text-slate-600">
+            <input type="checkbox" name="lembrar" class="mt-0 w-auto" />
+            Lembre-se de mim
+          </label>
           <button type="submit" class="btn-primary mt-2">Entrar</button>
         </form>
       </div>
