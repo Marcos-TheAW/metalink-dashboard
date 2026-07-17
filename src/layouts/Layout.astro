@@ -54,16 +54,16 @@ const linksAdmin = [
           <nav class="flex gap-1">
             {
               gruposNav.map((grupo) => (
-                <details name="nav-grupo" class="relative">
+                <details name="nav-grupo" class="nav-dropdown relative">
                   <summary
                     class="cursor-pointer list-none rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
                   >
                     {grupo.label}
                   </summary>
-                  <div class="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md border border-slate-300 bg-white py-1 shadow-lg">
+                  <div class="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md bg-brand-blue py-1 shadow-lg">
                     {
                       grupo.links.map((link) => (
-                        <a href={link.href} class="block px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue-600">
                           {link.label}
                         </a>
                       ))
@@ -74,16 +74,16 @@ const linksAdmin = [
             }
             {
               usuario.papel === 'admin' && (
-                <details name="nav-grupo" class="relative">
+                <details name="nav-grupo" class="nav-dropdown relative">
                   <summary
                     class="cursor-pointer list-none rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
                   >
                     Admin
                   </summary>
-                  <div class="absolute left-0 z-10 mt-1 min-w-[10rem] rounded-md border border-slate-300 bg-white py-1 shadow-lg">
+                  <div class="absolute left-0 z-10 mt-1 min-w-[10rem] rounded-md bg-brand-blue py-1 shadow-lg">
                     {
                       linksAdmin.map((link) => (
-                        <a href={link.href} class="block px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue-600">
                           {link.label}
                         </a>
                       ))

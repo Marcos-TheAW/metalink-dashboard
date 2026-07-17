@@ -8,6 +8,10 @@
   --color-brand-600: #14a97c;
   --color-brand-700: #0f8863;
 
+  /* Azul da marca (logo) — usado no fundo da lista suspensa do menu. */
+  --color-brand-blue: #2a4ff6;
+  --color-brand-blue-600: #1f3dd6;
+
   /* Tema escuro da marca: a escala "slate" do Tailwind é redefinida aqui,
      então toda classe que já usa slate (bg, text, border) nas páginas
      passa a refletir a nova paleta sem precisar tocar em cada arquivo. */
@@ -63,6 +67,18 @@
 }
 
 @layer components {
+  /* Dropdowns do menu principal (<details>): por padrão só abrem com clique
+     (comportamento nativo do <summary>). Aqui a lista também aparece ao
+     passar o mouse, sem exigir clique — sem precisar de JS. */
+  .nav-dropdown > div {
+    display: none;
+  }
+
+  .nav-dropdown[open] > div,
+  .nav-dropdown:hover > div {
+    display: block;
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow-sm transition-colors bg-brand-500 text-white hover:bg-brand-600;
   }
