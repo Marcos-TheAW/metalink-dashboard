@@ -54,42 +54,44 @@ const linksAdmin = [
           <nav class="flex gap-1">
             {
               gruposNav.map((grupo) => (
-                <details name="nav-grupo" class="nav-dropdown relative">
-                  <summary
-                    class="cursor-pointer list-none rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                <div class="group relative">
+                  <button
+                    type="button"
+                    class="cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
                   >
                     {grupo.label}
-                  </summary>
-                  <div class="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md bg-brand-blue py-1 shadow-lg">
+                  </button>
+                  <div class="absolute left-0 z-10 mt-1 hidden min-w-[12rem] rounded-md bg-[#2a2e51] py-1 shadow-lg group-hover:block group-focus-within:block">
                     {
                       grupo.links.map((link) => (
-                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue-600">
+                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue">
                           {link.label}
                         </a>
                       ))
                     }
                   </div>
-                </details>
+                </div>
               ))
             }
             {
               usuario.papel === 'admin' && (
-                <details name="nav-grupo" class="nav-dropdown relative">
-                  <summary
-                    class="cursor-pointer list-none rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                <div class="group relative">
+                  <button
+                    type="button"
+                    class="cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
                   >
                     Admin
-                  </summary>
-                  <div class="absolute left-0 z-10 mt-1 min-w-[10rem] rounded-md bg-brand-blue py-1 shadow-lg">
+                  </button>
+                  <div class="absolute left-0 z-10 mt-1 hidden min-w-[10rem] rounded-md bg-[#2a2e51] py-1 shadow-lg group-hover:block group-focus-within:block">
                     {
                       linksAdmin.map((link) => (
-                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue-600">
+                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue">
                           {link.label}
                         </a>
                       ))
                     }
                   </div>
-                </details>
+                </div>
               )
             }
           </nav>
