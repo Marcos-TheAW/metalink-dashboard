@@ -61,14 +61,16 @@ const linksAdmin = [
                   >
                     {grupo.label}
                   </button>
-                  <div class="absolute left-0 z-10 mt-1 hidden min-w-[12rem] rounded-md bg-[#2a2e51] py-1 shadow-lg group-hover:block group-focus-within:block">
-                    {
-                      grupo.links.map((link) => (
-                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue">
-                          {link.label}
-                        </a>
-                      ))
-                    }
+                  <div class="absolute left-0 top-full z-10 hidden pt-1 group-hover:block group-focus-within:block">
+                    <div class="min-w-[12rem] rounded-md bg-[#2a2e51] py-1 shadow-lg">
+                      {
+                        grupo.links.map((link) => (
+                          <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue">
+                            {link.label}
+                          </a>
+                        ))
+                      }
+                    </div>
                   </div>
                 </div>
               ))
@@ -82,14 +84,16 @@ const linksAdmin = [
                   >
                     Admin
                   </button>
-                  <div class="absolute left-0 z-10 mt-1 hidden min-w-[10rem] rounded-md bg-[#2a2e51] py-1 shadow-lg group-hover:block group-focus-within:block">
-                    {
-                      linksAdmin.map((link) => (
-                        <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue">
-                          {link.label}
-                        </a>
-                      ))
-                    }
+                  <div class="absolute left-0 top-full z-10 hidden pt-1 group-hover:block group-focus-within:block">
+                    <div class="min-w-[10rem] rounded-md bg-[#2a2e51] py-1 shadow-lg">
+                      {
+                        linksAdmin.map((link) => (
+                          <a href={link.href} class="block px-3 py-1.5 text-sm text-white hover:bg-brand-blue">
+                            {link.label}
+                          </a>
+                        ))
+                      }
+                    </div>
                   </div>
                 </div>
               )
