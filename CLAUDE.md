@@ -9,6 +9,11 @@ workbook ("Controle Operacional — Vendas e Relacionamento.xlsx"). Tracks pedid
 comerciais (sales/outreach actions) and clientes (clients), and derives relationship/revenue metrics
 from that raw data. Deploys to Cloudflare Workers at dashboard.metalinkbuilding.com.br.
 
+It also has a second, independent flow — **Prospecção de Sites** — that replaces a separate spreadsheet
+("Controle de Novos Parceiros Contatados") tracking the agency's own outreach to *sites* it wants to
+recruit as link-selling partners/suppliers. This is not about clients who already buy (that's
+Pedidos/Ações Comerciais); see the dedicated subsection below.
+
 Stack: Astro 7 (SSR) + `@astrojs/cloudflare` adapter, Cloudflare D1 (SQLite), Tailwind CSS v4, Bun as
 local runtime/package manager. No client-side JS framework — pages are server-rendered HTML with plain
 `<form>` POSTs; no build step beyond the standard Astro/Bun toolchain.
@@ -25,6 +30,7 @@ bun run db:migrate:remote      # apply migrations/0001_init.sql to the real D1 d
 bun run generate-types         # regenerate worker-configuration.d.ts from wrangler.jsonc bindings
 bun run deploy                 # astro build && wrangler deploy
 bun run import:planilha        # scripts/importar-planilha.ts — see header of that file for flags
+bun run import:registro-sites  # scripts/importar-registro-sites.ts — Registro de Sites CSV, see its header
 ```
 
 Migration files run in filename order; `0002_views.sql` must be applied after `0001_init.sql` (apply it
@@ -159,6 +165,41 @@ runtime has no `cloudflare:workers` binding access). Prefer pointing people at `
 the lower-friction path; the CLI script mainly exists for scripted/CI use. Money is `R$` strings/numbers
 at the spreadsheet boundary but always integer centavos inside the DB and app code — convert at the
 edges (`parseValorReais`, `centavosParaReais`), never carry floats through business logic.
+
+### Prospecção de Sites: a second, independent flow with its own week convention
+
+`sites_prospectados` (migration `0007`), plus two small read-mostly reference tables
+`tabela_precos_faixas`/`tabela_precos_red_flags` (migration `0007`, seeded by `0008`), live under
+`/prospeccao/*` and `/api/prospeccao/*`, with their own nav group in `Layout.astro`. Unlike
+`pedidos.data_pedido`/`acoes_comerciais.data_acao` (which store the actual event date and derive the
+Monday-of-week via SQL at query time, see `SEGUNDA_FEIRA_SQL` in `db.ts`), **`sites_prospectados.data_contato`
+stores the Monday directly** — the create/update API routes snap whatever date is submitted to that
+week's Monday via `segundaFeiraDaSemana()` (from `types.ts`) before saving, so grouping/filtering in SQL
+queries `data_contato` as-is, no derivation needed.
+
+The Overview page (`/prospeccao`) and Painel Semanal page (`/prospeccao/painel-semanal`) are both 100%
+computed from `sites_prospectados` — no stored aggregate columns, per the "business rules live in SQL
+views" convention above. This one feature needed 5 views instead of 1-2 (`migrations/0009_prospeccao_views.sql`):
+`v_prospeccao_semanal` (one row per week, backs Painel Semanal) plus one view per Overview block
+(`v_prospeccao_overview_volume/conversao/comercial/qualidade`) — split this way because the Overview's 4
+blocks together are ~60 columns with genuinely different windowing logic (accumulated / per-week-average
+/ current-week for most blocks; all-time / last-week / this-week AVG for the "Resultado Comercial"
+block), which would be unreadable as one view. `v_prospeccao_overview_conversao` and
+`v_prospeccao_overview_qualidade` compute their "Média por Semana"/"Semana Atual" columns by reading
+directly from `v_prospeccao_semanal` (views may reference other views in SQLite) rather than
+recalculating the same ratios — this guarantees the "% Perguntou sobre Inserção/Outros Domínios" formula
+is identical in both places, which the original spreadsheet's Overview and Painel Semanal tabs did not
+agree on. Every division in these views is `CASE WHEN denom <= 0 THEN NULL ELSE ... END` — never a raw
+divide — so `centavosOuTraco`/`percentualOuTraco`/`numeroOuTraco` (`types.ts`) can render `NULL` as `—`
+instead of the app ever seeing a divide-by-zero error or `NaN`.
+
+`tabela_precos_faixas`/`tabela_precos_red_flags` are read-only for everyone except admins, who get an
+inline edit popover per row (same `<details>` pattern as the per-row "⋮" edit menu on `/clientes`) on
+`/prospeccao/tabela-precos` itself — not under `/admin/*`, so unlike the `/admin/*` pages the two edit
+routes (`/api/prospeccao/tabela-precos/{faixas,red-flags}/[id].ts`) can't rely on the middleware's
+path-prefix gate and each do their own explicit `usuario.papel !== 'admin'` check. Both tables are a
+fixed 6-row reference set (DR/pricing bands, negotiation red flags) — there's no create/delete UI for
+them, only edit.
 
 ### D1 is already provisioned
 

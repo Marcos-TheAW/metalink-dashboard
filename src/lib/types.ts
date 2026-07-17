@@ -194,3 +194,114 @@ export interface KpisGerais {
   taxa_conversao: number;
   receita_em_risco_centavos: number;
 }
+
+// ---------- Prospecção de Sites ----------
+
+export type CanalProspeccao = 'whatsapp' | 'email';
+
+export type TipoContatoProspeccao = 'whatsapp_business' | 'email_comercial' | 'email_pessoal' | 'formulario';
+
+export type StatusProspeccao =
+  | 'nao_contatado'
+  | 'contatado_aguardando_resposta'
+  | 'em_negociacao'
+  | 'proposta_enviada'
+  | 'fechado'
+  | 'sem_interesse'
+  | 'sem_resposta_followup';
+
+export type TriEstado = 'sim' | 'nao' | 'nao_perguntado';
+export type SimNao = 'sim' | 'nao';
+
+export const CANAIS_PROSPECCAO: { value: CanalProspeccao; label: string }[] = [
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'email', label: 'E-mail' }
+];
+
+export const TIPOS_CONTATO_PROSPECCAO: { value: TipoContatoProspeccao; label: string }[] = [
+  { value: 'whatsapp_business', label: 'WhatsApp Business' },
+  { value: 'email_comercial', label: 'E-mail comercial' },
+  { value: 'email_pessoal', label: 'E-mail pessoal' },
+  { value: 'formulario', label: 'Formulário' }
+];
+
+export const STATUS_PROSPECCAO: { value: StatusProspeccao; label: string }[] = [
+  { value: 'nao_contatado', label: 'Não Contatado' },
+  { value: 'contatado_aguardando_resposta', label: 'Contatado - Aguardando Resposta' },
+  { value: 'em_negociacao', label: 'Em Negociação' },
+  { value: 'proposta_enviada', label: 'Proposta Enviada' },
+  { value: 'fechado', label: 'Fechado' },
+  { value: 'sem_interesse', label: 'Sem Interesse' },
+  { value: 'sem_resposta_followup', label: 'Sem Resposta (Follow-up)' }
+];
+
+export const OPCOES_TRI_ESTADO: { value: TriEstado; label: string }[] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'nao', label: 'Não' },
+  { value: 'nao_perguntado', label: 'Não Perguntado' }
+];
+
+export const OPCOES_SIM_NAO: { value: SimNao; label: string }[] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'nao', label: 'Não' }
+];
+
+export interface SiteProspectado {
+  id: number;
+  url_site: string;
+  domain_rating: number | null;
+  trafego_estimado: number | null;
+  nicho: string | null;
+  canal: CanalProspeccao;
+  tipo_contato: TipoContatoProspeccao;
+  status: StatusProspeccao;
+  num_tentativas: number;
+  data_contato: string;
+  link_email: string | null;
+  valor_solicitado_white_centavos: number | null;
+  valor_solicitado_black_centavos: number | null;
+  valor_fechado_white_centavos: number | null;
+  valor_fechado_black_centavos: number | null;
+  valor_fechado_insercao_centavos: number | null;
+  aceita_insercao: TriEstado | null;
+  aceita_pacote: TriEstado | null;
+  administra_outros_sites: TriEstado | null;
+  outros_sites_urls: string | null;
+  dentro_tabela_precos: SimNao | null;
+  observacoes: string | null;
+  responsavel_id: number | null;
+  criado_por: number;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface TabelaPrecoFaixa {
+  id: number;
+  ordem: number;
+  dr_min: number;
+  dr_max: number | null;
+  trafego_min: number | null;
+  trafego_max: number | null;
+  valor_min_centavos: number;
+  valor_max_centavos: number;
+  observacao: string | null;
+}
+
+export interface TabelaPrecoRedFlag {
+  id: number;
+  ordem: number;
+  sinal_de_alerta: string;
+  possivel_causa: string;
+}
+
+export function centavosOuTraco(centavos: number | null | undefined): string {
+  return centavos === null || centavos === undefined ? '—' : centavosParaReais(centavos);
+}
+
+export function percentualOuTraco(fracao: number | null | undefined): string {
+  return fracao === null || fracao === undefined || !Number.isFinite(fracao) ? '—' : `${(fracao * 100).toFixed(1)}%`;
+}
+
+export function numeroOuTraco(valor: number | null | undefined): string {
+  return valor === null || valor === undefined || !Number.isFinite(valor) ? '—' : valor.toLocaleString('pt-BR');
+}

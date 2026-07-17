@@ -80,7 +80,7 @@ function parseArgs(argv: string[]): Args {
 
 // ---------- CSV parsing (RFC4180 simples, sem dependências externas) ----------
 
-function parseCsv(conteudo: string): string[][] {
+export function parseCsv(conteudo: string): string[][] {
   const texto = conteudo.replace(/^﻿/, '').replace(/\r\n/g, '\n');
   const linhas: string[][] = [];
   let campo = '';
@@ -121,7 +121,7 @@ function parseCsv(conteudo: string): string[][] {
   return linhas.filter((l) => l.some((c) => c.trim() !== ''));
 }
 
-function csvParaObjetos(caminho: string): Record<string, string>[] {
+export function csvParaObjetos(caminho: string): Record<string, string>[] {
   const linhas = parseCsv(readFileSync(caminho, 'utf-8'));
   const [cabecalho, ...resto] = linhas;
   return resto.map((linha) => {
@@ -135,7 +135,7 @@ function csvParaObjetos(caminho: string): Record<string, string>[] {
 
 // ---------- Helpers de conversão ----------
 
-function labelParaValor(lista: { value: string; label: string }[], label: string): string | null {
+export function labelParaValor(lista: { value: string; label: string }[], label: string): string | null {
   const alvo = label.trim().toLowerCase();
   const porLabel = lista.find((o) => o.label.toLowerCase() === alvo);
   if (porLabel) return porLabel.value;
@@ -143,7 +143,7 @@ function labelParaValor(lista: { value: string; label: string }[], label: string
   return porValue?.value ?? null;
 }
 
-function parseValorReais(texto: string): number {
+export function parseValorReais(texto: string): number {
   let limpo = texto.replace(/[R$\s]/g, '');
   const ultimaVirgula = limpo.lastIndexOf(',');
   const ultimoPonto = limpo.lastIndexOf('.');
@@ -158,7 +158,7 @@ function parseValorReais(texto: string): number {
   return Math.round(valor * 100);
 }
 
-function parseData(texto: string): string {
+export function parseData(texto: string): string {
   const t = texto.trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
   const match = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
@@ -176,7 +176,7 @@ function parseData(texto: string): string {
   throw new Error(`Data inválida: "${texto}" (use DD/MM/AAAA, DD/MM/AA ou AAAA-MM-DD)`);
 }
 
-function sqlString(valor: string | number | null): string {
+export function sqlString(valor: string | number | null): string {
   if (valor === null || valor === undefined || valor === '') return 'NULL';
   if (typeof valor === 'number') return String(valor);
   return `'${valor.replace(/'/g, "''")}'`;
@@ -184,7 +184,7 @@ function sqlString(valor: string | number | null): string {
 
 // ---------- wrangler d1 execute ----------
 
-function executarD1(db: string, remote: boolean, args: string[]): string {
+export function executarD1(db: string, remote: boolean, args: string[]): string {
   return execFileSync(
     'node',
     ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', db, remote ? '--remote' : '--local', ...args],
@@ -192,7 +192,7 @@ function executarD1(db: string, remote: boolean, args: string[]): string {
   );
 }
 
-function buscarIdUsuario(db: string, remote: boolean, email: string): number {
+export function buscarIdUsuario(db: string, remote: boolean, email: string): number {
   const saida = executarD1(db, remote, [
     '--json',
     '--command',
@@ -326,7 +326,12 @@ async function main() {
   console.log('Importação concluída.');
 }
 
-main().catch((err) => {
-  console.error(`Erro na importação: ${err instanceof Error ? err.message : err}`);
-  process.exit(1);
-});
+// Guarda de entry-point: este arquivo agora também é importado como módulo por
+// scripts/importar-registro-sites.ts (reaproveitando os helpers) — sem essa checagem,
+// o main() abaixo rodaria de novo (com o argv errado) toda vez que fosse importado.
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(`Erro na importação: ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  });
+}

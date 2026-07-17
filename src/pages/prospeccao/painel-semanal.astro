@@ -1,0 +1,80 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { listPainelSemanal } from '../../lib/db';
+import { centavosOuTraco, formatarDataBR, numeroOuTraco, percentualOuTraco } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const semanas = await listPainelSemanal();
+---
+
+<Layout title="Painel Semanal" usuario={usuario}>
+  <h1 class="mb-6">Painel Semanal</h1>
+  <p class="mb-6 text-sm text-slate-500">
+    Somente leitura — todos os valores são calculados automaticamente a partir do Registro de Sites, semana a
+    semana (segunda-feira mais recente primeiro).
+  </p>
+
+  <div class="card overflow-x-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Semana</th>
+          <th>Sites Contatados</th>
+          <th>Via WhatsApp</th>
+          <th>Via E-mail</th>
+          <th>Follow-ups</th>
+          <th>Taxa de Resposta</th>
+          <th>Taxa de Negociação</th>
+          <th>Taxa Fechamento (contatados)</th>
+          <th>Taxa Fechamento (respondentes)</th>
+          <th>Taxa de Recusa</th>
+          <th>Sites Fechados</th>
+          <th>Valor Médio White Hat</th>
+          <th>Valor Médio Black Hat</th>
+          <th>Valor Médio Inserção</th>
+          <th>% Aceita Inserção</th>
+          <th>% Adm. Outros Sites</th>
+          <th>Novos Sites Derivados</th>
+          <th>% Fechamentos na Tabela</th>
+          <th>% Negoc. com Pacote</th>
+          <th>% Perguntou sobre Inserção</th>
+          <th>% Perguntou sobre Outros Domínios</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          semanas.map((s) => (
+            <tr>
+              <td class="whitespace-nowrap font-medium text-slate-900">{formatarDataBR(s.semana)}</td>
+              <td>{numeroOuTraco(s.total)}</td>
+              <td>{numeroOuTraco(s.via_whatsapp)}</td>
+              <td>{numeroOuTraco(s.via_email)}</td>
+              <td>{numeroOuTraco(s.followups)}</td>
+              <td>{percentualOuTraco(s.taxa_resposta)}</td>
+              <td>{percentualOuTraco(s.taxa_negociacao)}</td>
+              <td>{percentualOuTraco(s.taxa_fechamento_contatados)}</td>
+              <td>{percentualOuTraco(s.taxa_fechamento_respondentes)}</td>
+              <td>{percentualOuTraco(s.taxa_recusa)}</td>
+              <td>{numeroOuTraco(s.sites_fechados)}</td>
+              <td>{centavosOuTraco(s.valor_medio_white_centavos)}</td>
+              <td>{centavosOuTraco(s.valor_medio_black_centavos)}</td>
+              <td>{centavosOuTraco(s.valor_medio_insercao_centavos)}</td>
+              <td>{percentualOuTraco(s.pct_aceita_insercao)}</td>
+              <td>{percentualOuTraco(s.pct_administra_outros_sites)}</td>
+              <td>{numeroOuTraco(s.novos_sites_derivados)}</td>
+              <td>{percentualOuTraco(s.pct_dentro_tabela_precos)}</td>
+              <td>{percentualOuTraco(s.pct_pacote_fechado)}</td>
+              <td>{percentualOuTraco(s.pct_perguntou_insercao)}</td>
+              <td>{percentualOuTraco(s.pct_perguntou_outros_dominios)}</td>
+            </tr>
+          ))
+        }
+        {semanas.length === 0 && (
+          <tr>
+            <td colspan="20" class="text-center text-slate-400">Nenhum site prospectado registrado ainda.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</Layout>

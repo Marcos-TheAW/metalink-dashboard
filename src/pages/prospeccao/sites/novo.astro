@@ -1,0 +1,147 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import ErrorBanner from '../../../components/ErrorBanner.astro';
+import FormSelect from '../../../components/FormSelect.astro';
+import { listUsuariosAtivos } from '../../../lib/db';
+import {
+  CANAIS_PROSPECCAO,
+  OPCOES_SIM_NAO,
+  OPCOES_TRI_ESTADO,
+  STATUS_PROSPECCAO,
+  TIPOS_CONTATO_PROSPECCAO
+} from '../../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const erro = Astro.url.searchParams.get('erro');
+
+const usuarios = await listUsuariosAtivos();
+const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome }));
+
+const hoje = new Date().toISOString().slice(0, 10);
+---
+
+<Layout title="Novo site prospectado" usuario={usuario}>
+  <h1 class="mb-6">Novo site prospectado</h1>
+
+  <ErrorBanner mensagem={erro} />
+
+  <form method="post" action="/api/prospeccao/sites" class="card grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div class="sm:col-span-2">
+      <label for="url_site">URL do Site <span class="text-red-500">*</span></label>
+      <input type="text" id="url_site" name="url_site" placeholder="exemplo.com.br" required />
+    </div>
+
+    <div>
+      <label for="domain_rating">Domain Rating</label>
+      <input type="number" id="domain_rating" name="domain_rating" min="0" step="1" />
+    </div>
+
+    <div>
+      <label for="trafego_estimado">Tráfego Estimado</label>
+      <input type="number" id="trafego_estimado" name="trafego_estimado" min="0" step="1" />
+    </div>
+
+    <div>
+      <label for="nicho">Nicho</label>
+      <input type="text" id="nicho" name="nicho" />
+    </div>
+
+    <div>
+      <label for="num_tentativas">Nº de Tentativas <span class="text-red-500">*</span></label>
+      <input type="number" id="num_tentativas" name="num_tentativas" min="1" step="1" value="1" required />
+    </div>
+
+    <FormSelect name="canal" label="Canal" options={CANAIS_PROSPECCAO} required placeholder="Selecione o canal" />
+    <FormSelect
+      name="tipo_contato"
+      label="Tipo de Contato"
+      options={TIPOS_CONTATO_PROSPECCAO}
+      required
+      placeholder="Selecione o tipo de contato"
+    />
+    <FormSelect name="status" label="Status" options={STATUS_PROSPECCAO} value="nao_contatado" required />
+
+    <div>
+      <label for="data_contato">Data do Contato <span class="text-red-500">*</span></label>
+      <input type="date" id="data_contato" name="data_contato" value={hoje} required />
+      <p class="mt-1 text-xs text-slate-500">
+        Sempre a segunda-feira da semana do contato — a data será ajustada automaticamente se não for uma segunda.
+      </p>
+    </div>
+
+    <div class="sm:col-span-2">
+      <label for="link_email">Link do E-mail Enviado</label>
+      <input type="url" id="link_email" name="link_email" placeholder="https://…" />
+    </div>
+
+    <div>
+      <label for="valor_solicitado_white_reais">Valor Solicitado — White Hat (R$)</label>
+      <input type="number" id="valor_solicitado_white_reais" name="valor_solicitado_white_reais" min="0" step="0.01" />
+    </div>
+
+    <div>
+      <label for="valor_solicitado_black_reais">Valor Solicitado — Black Hat (R$)</label>
+      <input type="number" id="valor_solicitado_black_reais" name="valor_solicitado_black_reais" min="0" step="0.01" />
+    </div>
+
+    <div>
+      <label for="valor_fechado_white_reais">Valor Fechado — White Hat (R$)</label>
+      <input type="number" id="valor_fechado_white_reais" name="valor_fechado_white_reais" min="0" step="0.01" />
+    </div>
+
+    <div>
+      <label for="valor_fechado_black_reais">Valor Fechado — Black Hat (R$)</label>
+      <input type="number" id="valor_fechado_black_reais" name="valor_fechado_black_reais" min="0" step="0.01" />
+    </div>
+
+    <div>
+      <label for="valor_fechado_insercao_reais">Valor Fechado — Inserção de Link (R$)</label>
+      <input type="number" id="valor_fechado_insercao_reais" name="valor_fechado_insercao_reais" min="0" step="0.01" />
+    </div>
+
+    <FormSelect
+      name="aceita_insercao"
+      label="Aceita Inserção?"
+      options={OPCOES_TRI_ESTADO}
+      value="nao_perguntado"
+      placeholder="Selecione"
+    />
+    <FormSelect
+      name="aceita_pacote"
+      label="Aceita Pacote?"
+      options={OPCOES_TRI_ESTADO}
+      value="nao_perguntado"
+      placeholder="Selecione"
+    />
+    <FormSelect
+      name="administra_outros_sites"
+      label="Administra Outros Sites?"
+      options={OPCOES_TRI_ESTADO}
+      value="nao_perguntado"
+      placeholder="Selecione"
+    />
+    <FormSelect
+      name="dentro_tabela_precos"
+      label="Dentro da Tabela de Preços?"
+      options={OPCOES_SIM_NAO}
+      placeholder="Ainda não fechado"
+    />
+
+    <div class="sm:col-span-2">
+      <label for="outros_sites_urls">URLs de Outros Sites Administrados</label>
+      <input type="text" id="outros_sites_urls" name="outros_sites_urls" placeholder="site-a.com, site-b.com" />
+    </div>
+
+    <FormSelect name="responsavel_id" label="Responsável" options={opcoesUsuarios} placeholder="Sem responsável definido" />
+
+    <div class="sm:col-span-2">
+      <label for="observacoes">Observações</label>
+      <textarea id="observacoes" name="observacoes" rows="3"></textarea>
+    </div>
+
+    <div class="flex gap-3 sm:col-span-2">
+      <button type="submit" class="btn-primary">Salvar site</button>
+      <a href="/prospeccao/sites" class="btn-secondary">Cancelar</a>
+    </div>
+  </form>
+</Layout>

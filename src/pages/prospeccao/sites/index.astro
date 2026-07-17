@@ -1,0 +1,127 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import BotaoExcluir from '../../../components/BotaoExcluir.astro';
+import KpiCard from '../../../components/KpiCard.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import { listSitesProspectados } from '../../../lib/db';
+import {
+  CANAIS_PROSPECCAO,
+  STATUS_PROSPECCAO,
+  formatarDataBR,
+  labelFor,
+  numeroOuTraco,
+  percentualOuTraco
+} from '../../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const url = Astro.url;
+
+const status = url.searchParams.get('status') ?? '';
+const canal = url.searchParams.get('canal') ?? '';
+const nicho = url.searchParams.get('nicho') ?? '';
+
+const sites = await listSitesProspectados({
+  status: status || undefined,
+  canal: canal || undefined,
+  nicho: nicho || undefined
+});
+
+const totalSites = sites.length;
+const totalFechados = sites.filter((s) => s.status === 'fechado').length;
+const totalAguardando = sites.filter((s) => s.status === 'contatado_aguardando_resposta').length;
+const respondentes = totalSites - totalAguardando;
+const taxaResposta = totalSites > 0 ? respondentes / totalSites : null;
+---
+
+<Layout title="Registro de Sites" usuario={usuario}>
+  <div class="mb-6 flex items-center justify-between">
+    <h1>Registro de Sites</h1>
+    <a href="/prospeccao/sites/novo" class="btn-primary">Novo site prospectado</a>
+  </div>
+
+  <form method="get" class="card mb-6 flex flex-col gap-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="">Todos</option>
+          {STATUS_PROSPECCAO.map((s) => <option value={s.value} selected={s.value === status}>{s.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="canal">Canal</label>
+        <select id="canal" name="canal">
+          <option value="">Todos</option>
+          {CANAIS_PROSPECCAO.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="nicho">Nicho</label>
+        <input type="text" id="nicho" name="nicho" value={nicho} placeholder="Ex: finanças" />
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit" class="btn-primary">Filtrar</button>
+      <a href="/prospeccao/sites" class="btn-secondary">Limpar filtros</a>
+    </div>
+  </form>
+
+  <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <KpiCard label="Sites (filtro atual)" value={numeroOuTraco(totalSites)} />
+    <KpiCard label="Fechados (filtro atual)" value={numeroOuTraco(totalFechados)} />
+    <KpiCard label="Taxa de resposta (filtro atual)" value={percentualOuTraco(taxaResposta)} />
+  </section>
+
+  <div class="card overflow-x-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Semana</th>
+          <th>Site</th>
+          <th>DR</th>
+          <th>Nicho</th>
+          <th>Canal</th>
+          <th>Tentativas</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          sites.map((s) => (
+            <tr>
+              <td>{formatarDataBR(s.data_contato)}</td>
+              <td>
+                <a href={`/prospeccao/sites/${s.id}`} class="font-medium text-brand-600 hover:underline">
+                  {s.url_site}
+                </a>
+              </td>
+              <td>{numeroOuTraco(s.domain_rating)}</td>
+              <td>{s.nicho ?? '—'}</td>
+              <td>{labelFor(CANAIS_PROSPECCAO, s.canal)}</td>
+              <td>{s.num_tentativas}</td>
+              <td>
+                <StatusBadge value={s.status} label={labelFor(STATUS_PROSPECCAO, s.status)} />
+              </td>
+              <td class="whitespace-nowrap">
+                <a href={`/prospeccao/sites/${s.id}`} class="text-brand-600 hover:underline text-sm">Editar</a>
+                <span class="mx-1.5 text-slate-300">·</span>
+                <BotaoExcluir
+                  action={`/api/prospeccao/sites/${s.id}/excluir`}
+                  mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o site ${s.url_site}? Todos os dados desse registro serão perdidos permanentemente.`}
+                  compacto
+                />
+              </td>
+            </tr>
+          ))
+        }
+        {sites.length === 0 && (
+          <tr>
+            <td colspan="8" class="text-center text-slate-400">Nenhum site prospectado encontrado para esses filtros.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</Layout>

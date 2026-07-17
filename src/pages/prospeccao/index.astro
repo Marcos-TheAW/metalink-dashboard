@@ -1,0 +1,260 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import {
+  getProspeccaoOverviewComercial,
+  getProspeccaoOverviewConversao,
+  getProspeccaoOverviewQualidade,
+  getProspeccaoOverviewVolume
+} from '../../lib/db';
+import { centavosOuTraco, numeroOuTraco, percentualOuTraco } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+
+const [volume, conversao, comercial, qualidade] = await Promise.all([
+  getProspeccaoOverviewVolume(),
+  getProspeccaoOverviewConversao(),
+  getProspeccaoOverviewComercial(),
+  getProspeccaoOverviewQualidade()
+]);
+
+const linhasVolume = [
+  {
+    metrica: 'Sites Contatados',
+    total: numeroOuTraco(volume.sites_contatados_total),
+    media: numeroOuTraco(volume.sites_contatados_media_semana),
+    atual: numeroOuTraco(volume.sites_contatados_semana_atual)
+  },
+  {
+    metrica: 'Contatos via WhatsApp',
+    total: numeroOuTraco(volume.contatos_whatsapp_total),
+    media: numeroOuTraco(volume.contatos_whatsapp_media_semana),
+    atual: numeroOuTraco(volume.contatos_whatsapp_semana_atual)
+  },
+  {
+    metrica: 'Contatos via E-mail',
+    total: numeroOuTraco(volume.contatos_email_total),
+    media: numeroOuTraco(volume.contatos_email_media_semana),
+    atual: numeroOuTraco(volume.contatos_email_semana_atual)
+  },
+  {
+    metrica: 'Follow-ups Enviados',
+    total: numeroOuTraco(volume.followups_total),
+    media: numeroOuTraco(volume.followups_media_semana),
+    atual: numeroOuTraco(volume.followups_semana_atual)
+  }
+];
+
+const linhasConversao = [
+  {
+    metrica: 'Taxa de Resposta',
+    total: percentualOuTraco(conversao.taxa_resposta_total),
+    media: percentualOuTraco(conversao.taxa_resposta_media_semana),
+    atual: percentualOuTraco(conversao.taxa_resposta_semana_atual)
+  },
+  {
+    metrica: 'Taxa de Negociação',
+    total: percentualOuTraco(conversao.taxa_negociacao_total),
+    media: percentualOuTraco(conversao.taxa_negociacao_media_semana),
+    atual: percentualOuTraco(conversao.taxa_negociacao_semana_atual)
+  },
+  {
+    metrica: 'Taxa de Fechamento (sobre contatados)',
+    total: percentualOuTraco(conversao.taxa_fechamento_contatados_total),
+    media: percentualOuTraco(conversao.taxa_fechamento_contatados_media_semana),
+    atual: percentualOuTraco(conversao.taxa_fechamento_contatados_semana_atual)
+  },
+  {
+    metrica: 'Taxa de Fechamento (sobre respondentes)',
+    total: percentualOuTraco(conversao.taxa_fechamento_respondentes_total),
+    media: percentualOuTraco(conversao.taxa_fechamento_respondentes_media_semana),
+    atual: percentualOuTraco(conversao.taxa_fechamento_respondentes_semana_atual)
+  },
+  {
+    metrica: 'Taxa de Recusa',
+    total: percentualOuTraco(conversao.taxa_recusa_total),
+    media: percentualOuTraco(conversao.taxa_recusa_media_semana),
+    atual: percentualOuTraco(conversao.taxa_recusa_semana_atual)
+  }
+];
+
+const linhasComercial = [
+  {
+    metrica: 'Sites Fechados',
+    geral: numeroOuTraco(comercial.sites_fechados_geral),
+    ultimaSemana: numeroOuTraco(comercial.sites_fechados_ultima_semana),
+    atual: numeroOuTraco(comercial.sites_fechados_semana_atual)
+  },
+  {
+    metrica: 'Valor Médio Artigo White Hat',
+    geral: centavosOuTraco(comercial.valor_medio_white_geral),
+    ultimaSemana: centavosOuTraco(comercial.valor_medio_white_ultima_semana),
+    atual: centavosOuTraco(comercial.valor_medio_white_semana_atual)
+  },
+  {
+    metrica: 'Valor Médio Artigo Black Hat',
+    geral: centavosOuTraco(comercial.valor_medio_black_geral),
+    ultimaSemana: centavosOuTraco(comercial.valor_medio_black_ultima_semana),
+    atual: centavosOuTraco(comercial.valor_medio_black_semana_atual)
+  },
+  {
+    metrica: 'Valor Médio Inserção de Link',
+    geral: centavosOuTraco(comercial.valor_medio_insercao_geral),
+    ultimaSemana: centavosOuTraco(comercial.valor_medio_insercao_ultima_semana),
+    atual: centavosOuTraco(comercial.valor_medio_insercao_semana_atual)
+  },
+  {
+    metrica: '% Sites que Aceitam Inserção',
+    geral: percentualOuTraco(comercial.pct_aceita_insercao_geral),
+    ultimaSemana: percentualOuTraco(comercial.pct_aceita_insercao_ultima_semana),
+    atual: percentualOuTraco(comercial.pct_aceita_insercao_semana_atual)
+  },
+  {
+    metrica: '% Sites com Outros Domínios',
+    geral: percentualOuTraco(comercial.pct_administra_outros_geral),
+    ultimaSemana: percentualOuTraco(comercial.pct_administra_outros_ultima_semana),
+    atual: percentualOuTraco(comercial.pct_administra_outros_semana_atual)
+  },
+  {
+    metrica: 'Novos Sites Derivados',
+    geral: numeroOuTraco(comercial.novos_sites_derivados_geral),
+    ultimaSemana: numeroOuTraco(comercial.novos_sites_derivados_ultima_semana),
+    atual: numeroOuTraco(comercial.novos_sites_derivados_semana_atual)
+  }
+];
+
+const linhasQualidade = [
+  {
+    metrica: '% Fechamentos Dentro da Tabela de Preços',
+    total: percentualOuTraco(qualidade.pct_dentro_tabela_total),
+    media: percentualOuTraco(qualidade.pct_dentro_tabela_media_semana),
+    atual: percentualOuTraco(qualidade.pct_dentro_tabela_semana_atual)
+  },
+  {
+    metrica: '% Negociações com Pacote Fechado',
+    total: percentualOuTraco(qualidade.pct_pacote_fechado_total),
+    media: percentualOuTraco(qualidade.pct_pacote_fechado_media_semana),
+    atual: percentualOuTraco(qualidade.pct_pacote_fechado_semana_atual)
+  },
+  {
+    metrica: '% Sites onde Perguntou sobre Inserção',
+    total: percentualOuTraco(qualidade.pct_perguntou_insercao_total),
+    media: percentualOuTraco(qualidade.pct_perguntou_insercao_media_semana),
+    atual: percentualOuTraco(qualidade.pct_perguntou_insercao_semana_atual)
+  },
+  {
+    metrica: '% Sites onde Perguntou sobre Outros Domínios',
+    total: percentualOuTraco(qualidade.pct_perguntou_outros_total),
+    media: percentualOuTraco(qualidade.pct_perguntou_outros_media_semana),
+    atual: percentualOuTraco(qualidade.pct_perguntou_outros_semana_atual)
+  }
+];
+---
+
+<Layout title="Prospecção de Sites — Overview" usuario={usuario}>
+  <h1 class="mb-2">Prospecção de Sites — Overview</h1>
+  <p class="mb-6 text-sm font-medium text-slate-600">Meta semanal: 50 sites contatados | 15 sites fechados</p>
+
+  <section class="card">
+    <h2>Volume de Atividade</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>Total Acumulado</th>
+          <th>Média por Semana</th>
+          <th>Semana Atual</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          linhasVolume.map((linha) => (
+            <tr>
+              <td class="font-medium text-slate-900">{linha.metrica}</td>
+              <td>{linha.total}</td>
+              <td>{linha.media}</td>
+              <td>{linha.atual}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <section class="mt-6 card">
+    <h2>Conversão</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>Total Acumulado</th>
+          <th>Média por Semana</th>
+          <th>Semana Atual</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          linhasConversao.map((linha) => (
+            <tr>
+              <td class="font-medium text-slate-900">{linha.metrica}</td>
+              <td>{linha.total}</td>
+              <td>{linha.media}</td>
+              <td>{linha.atual}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <section class="mt-6 card">
+    <h2>Resultado Comercial</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>Média Geral</th>
+          <th>Média da Última Semana</th>
+          <th>Semana Atual</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          linhasComercial.map((linha) => (
+            <tr>
+              <td class="font-medium text-slate-900">{linha.metrica}</td>
+              <td>{linha.geral}</td>
+              <td>{linha.ultimaSemana}</td>
+              <td>{linha.atual}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <section class="mt-6 card">
+    <h2>Qualidade da Negociação</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>Total Acumulado</th>
+          <th>Média por Semana</th>
+          <th>Semana Atual</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          linhasQualidade.map((linha) => (
+            <tr>
+              <td class="font-medium text-slate-900">{linha.metrica}</td>
+              <td>{linha.total}</td>
+              <td>{linha.media}</td>
+              <td>{linha.atual}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+</Layout>

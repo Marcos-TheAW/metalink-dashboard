@@ -1,0 +1,250 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import BotaoExcluir from '../../../components/BotaoExcluir.astro';
+import ErrorBanner from '../../../components/ErrorBanner.astro';
+import FormSelect from '../../../components/FormSelect.astro';
+import { getSiteProspectado, listHistorico, listUsuariosAtivos } from '../../../lib/db';
+import {
+  CANAIS_PROSPECCAO,
+  OPCOES_SIM_NAO,
+  OPCOES_TRI_ESTADO,
+  STATUS_PROSPECCAO,
+  TIPOS_CONTATO_PROSPECCAO
+} from '../../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const id = Number(Astro.params.id);
+const erro = Astro.url.searchParams.get('erro');
+
+const site = Number.isFinite(id) ? await getSiteProspectado(id) : null;
+
+if (!site) {
+  Astro.response.status = 404;
+}
+
+const [usuarios, historico] = site
+  ? await Promise.all([listUsuariosAtivos(), listHistorico('sites_prospectados', id)])
+  : [[], []];
+
+const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome }));
+
+function centavosParaCampo(centavos: number | null): string {
+  return centavos === null || centavos === undefined ? '' : (centavos / 100).toFixed(2);
+}
+---
+
+<Layout title={site ? `Site #${site.id}` : 'Site não encontrado'} usuario={usuario}>
+  {
+    !site ? (
+      <div class="card">Site prospectado não encontrado.</div>
+    ) : (
+      <>
+        <h1 class="mb-6">Site #{site.id} — {site.url_site}</h1>
+
+        <ErrorBanner mensagem={erro} />
+
+        <form method="post" action={`/api/prospeccao/sites/${site.id}`} class="card grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <label for="url_site">URL do Site <span class="text-red-500">*</span></label>
+            <input type="text" id="url_site" name="url_site" value={site.url_site} required />
+          </div>
+
+          <div>
+            <label for="domain_rating">Domain Rating</label>
+            <input type="number" id="domain_rating" name="domain_rating" min="0" step="1" value={site.domain_rating ?? ''} />
+          </div>
+
+          <div>
+            <label for="trafego_estimado">Tráfego Estimado</label>
+            <input type="number" id="trafego_estimado" name="trafego_estimado" min="0" step="1" value={site.trafego_estimado ?? ''} />
+          </div>
+
+          <div>
+            <label for="nicho">Nicho</label>
+            <input type="text" id="nicho" name="nicho" value={site.nicho ?? ''} />
+          </div>
+
+          <div>
+            <label for="num_tentativas">Nº de Tentativas <span class="text-red-500">*</span></label>
+            <input type="number" id="num_tentativas" name="num_tentativas" min="1" step="1" value={site.num_tentativas} required />
+          </div>
+
+          <FormSelect name="canal" label="Canal" options={CANAIS_PROSPECCAO} value={site.canal} required />
+          <FormSelect
+            name="tipo_contato"
+            label="Tipo de Contato"
+            options={TIPOS_CONTATO_PROSPECCAO}
+            value={site.tipo_contato}
+            required
+          />
+          <FormSelect name="status" label="Status" options={STATUS_PROSPECCAO} value={site.status} required />
+
+          <div>
+            <label for="data_contato">Data do Contato <span class="text-red-500">*</span></label>
+            <input type="date" id="data_contato" name="data_contato" value={site.data_contato} required />
+            <p class="mt-1 text-xs text-slate-500">
+              Sempre a segunda-feira da semana do contato — a data será ajustada automaticamente se não for uma segunda.
+            </p>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label for="link_email">Link do E-mail Enviado</label>
+            <input type="url" id="link_email" name="link_email" value={site.link_email ?? ''} placeholder="https://…" />
+          </div>
+
+          <div>
+            <label for="valor_solicitado_white_reais">Valor Solicitado — White Hat (R$)</label>
+            <input
+              type="number"
+              id="valor_solicitado_white_reais"
+              name="valor_solicitado_white_reais"
+              min="0"
+              step="0.01"
+              value={centavosParaCampo(site.valor_solicitado_white_centavos)}
+            />
+          </div>
+
+          <div>
+            <label for="valor_solicitado_black_reais">Valor Solicitado — Black Hat (R$)</label>
+            <input
+              type="number"
+              id="valor_solicitado_black_reais"
+              name="valor_solicitado_black_reais"
+              min="0"
+              step="0.01"
+              value={centavosParaCampo(site.valor_solicitado_black_centavos)}
+            />
+          </div>
+
+          <div>
+            <label for="valor_fechado_white_reais">Valor Fechado — White Hat (R$)</label>
+            <input
+              type="number"
+              id="valor_fechado_white_reais"
+              name="valor_fechado_white_reais"
+              min="0"
+              step="0.01"
+              value={centavosParaCampo(site.valor_fechado_white_centavos)}
+            />
+          </div>
+
+          <div>
+            <label for="valor_fechado_black_reais">Valor Fechado — Black Hat (R$)</label>
+            <input
+              type="number"
+              id="valor_fechado_black_reais"
+              name="valor_fechado_black_reais"
+              min="0"
+              step="0.01"
+              value={centavosParaCampo(site.valor_fechado_black_centavos)}
+            />
+          </div>
+
+          <div>
+            <label for="valor_fechado_insercao_reais">Valor Fechado — Inserção de Link (R$)</label>
+            <input
+              type="number"
+              id="valor_fechado_insercao_reais"
+              name="valor_fechado_insercao_reais"
+              min="0"
+              step="0.01"
+              value={centavosParaCampo(site.valor_fechado_insercao_centavos)}
+            />
+          </div>
+
+          <FormSelect
+            name="aceita_insercao"
+            label="Aceita Inserção?"
+            options={OPCOES_TRI_ESTADO}
+            value={site.aceita_insercao ?? ''}
+            placeholder="Selecione"
+          />
+          <FormSelect
+            name="aceita_pacote"
+            label="Aceita Pacote?"
+            options={OPCOES_TRI_ESTADO}
+            value={site.aceita_pacote ?? ''}
+            placeholder="Selecione"
+          />
+          <FormSelect
+            name="administra_outros_sites"
+            label="Administra Outros Sites?"
+            options={OPCOES_TRI_ESTADO}
+            value={site.administra_outros_sites ?? ''}
+            placeholder="Selecione"
+          />
+          <FormSelect
+            name="dentro_tabela_precos"
+            label="Dentro da Tabela de Preços?"
+            options={OPCOES_SIM_NAO}
+            value={site.dentro_tabela_precos ?? ''}
+            placeholder="Ainda não fechado"
+          />
+
+          <div class="sm:col-span-2">
+            <label for="outros_sites_urls">URLs de Outros Sites Administrados</label>
+            <input type="text" id="outros_sites_urls" name="outros_sites_urls" value={site.outros_sites_urls ?? ''} />
+          </div>
+
+          <FormSelect
+            name="responsavel_id"
+            label="Responsável"
+            options={opcoesUsuarios}
+            value={site.responsavel_id ? String(site.responsavel_id) : ''}
+            placeholder="Sem responsável definido"
+          />
+
+          <div class="sm:col-span-2">
+            <label for="observacoes">Observações</label>
+            <textarea id="observacoes" name="observacoes" rows="3">{site.observacoes ?? ''}</textarea>
+          </div>
+
+          <div class="flex gap-3 sm:col-span-2">
+            <button type="submit" class="btn-primary">Salvar alterações</button>
+            <a href="/prospeccao/sites" class="btn-secondary">Voltar</a>
+          </div>
+        </form>
+
+        <div class="mt-4">
+          <BotaoExcluir
+            action={`/api/prospeccao/sites/${site.id}/excluir`}
+            mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o site ${site.url_site}? Todos os dados desse registro serão perdidos permanentemente.`}
+          />
+        </div>
+
+        <section class="mt-8">
+          <h2 class="mb-3">Histórico de alterações</h2>
+          <div class="card overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Quando</th>
+                  <th>Usuário</th>
+                  <th>Campo</th>
+                  <th>De</th>
+                  <th>Para</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historico.map((h: any) => (
+                  <tr>
+                    <td>{h.criado_em}</td>
+                    <td>{h.usuario_nome ?? '—'}</td>
+                    <td>{h.campo}</td>
+                    <td>{h.valor_anterior ?? '—'}</td>
+                    <td>{h.valor_novo ?? '—'}</td>
+                  </tr>
+                ))}
+                {historico.length === 0 && (
+                  <tr>
+                    <td colspan="5" class="text-center text-slate-400">Nenhuma alteração registrada ainda.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </>
+    )
+  }
+</Layout>

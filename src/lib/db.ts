@@ -6,6 +6,9 @@ import type {
   KpisGerais,
   Papel,
   Pedido,
+  SiteProspectado,
+  TabelaPrecoFaixa,
+  TabelaPrecoRedFlag,
   Usuario,
   UsuarioCredenciais
 } from './types';
@@ -626,4 +629,466 @@ export async function listHistorico(tabela: string, registroId: number) {
     .bind(tabela, registroId)
     .all();
   return results;
+}
+
+// ---------- Prospecção de Sites ----------
+
+export interface FiltrosSitesProspectados {
+  status?: string;
+  canal?: string;
+  nicho?: string;
+}
+
+export async function listSitesProspectados(filtros: FiltrosSitesProspectados = {}): Promise<SiteProspectado[]> {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (filtros.status) {
+    clauses.push('status = ?');
+    params.push(filtros.status);
+  }
+  if (filtros.canal) {
+    clauses.push('canal = ?');
+    params.push(filtros.canal);
+  }
+  if (filtros.nicho) {
+    clauses.push('nicho LIKE ?');
+    params.push(`%${filtros.nicho}%`);
+  }
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const { results } = await db()
+    .prepare(`SELECT * FROM sites_prospectados ${where} ORDER BY data_contato DESC, id DESC`)
+    .bind(...params)
+    .all<SiteProspectado>();
+  return results;
+}
+
+export async function getSiteProspectado(id: number): Promise<SiteProspectado | null> {
+  const row = await db().prepare('SELECT * FROM sites_prospectados WHERE id = ?').bind(id).first<SiteProspectado>();
+  return row ?? null;
+}
+
+export interface SiteProspectadoInput {
+  url_site: string;
+  domain_rating: number | null;
+  trafego_estimado: number | null;
+  nicho: string | null;
+  canal: string;
+  tipo_contato: string;
+  status: string;
+  num_tentativas: number;
+  data_contato: string;
+  link_email: string | null;
+  valor_solicitado_white_centavos: number | null;
+  valor_solicitado_black_centavos: number | null;
+  valor_fechado_white_centavos: number | null;
+  valor_fechado_black_centavos: number | null;
+  valor_fechado_insercao_centavos: number | null;
+  aceita_insercao: string | null;
+  aceita_pacote: string | null;
+  administra_outros_sites: string | null;
+  outros_sites_urls: string | null;
+  dentro_tabela_precos: string | null;
+  observacoes: string | null;
+  responsavel_id: number | null;
+}
+
+export async function criarSiteProspectado(input: SiteProspectadoInput, usuarioId: number): Promise<number> {
+  const result = await db()
+    .prepare(
+      `INSERT INTO sites_prospectados
+         (url_site, domain_rating, trafego_estimado, nicho, canal, tipo_contato, status, num_tentativas,
+          data_contato, link_email, valor_solicitado_white_centavos, valor_solicitado_black_centavos,
+          valor_fechado_white_centavos, valor_fechado_black_centavos, valor_fechado_insercao_centavos,
+          aceita_insercao, aceita_pacote, administra_outros_sites, outros_sites_urls, dentro_tabela_precos,
+          observacoes, responsavel_id, criado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      input.url_site,
+      input.domain_rating,
+      input.trafego_estimado,
+      input.nicho,
+      input.canal,
+      input.tipo_contato,
+      input.status,
+      input.num_tentativas,
+      input.data_contato,
+      input.link_email,
+      input.valor_solicitado_white_centavos,
+      input.valor_solicitado_black_centavos,
+      input.valor_fechado_white_centavos,
+      input.valor_fechado_black_centavos,
+      input.valor_fechado_insercao_centavos,
+      input.aceita_insercao,
+      input.aceita_pacote,
+      input.administra_outros_sites,
+      input.outros_sites_urls,
+      input.dentro_tabela_precos,
+      input.observacoes,
+      input.responsavel_id,
+      usuarioId
+    )
+    .run();
+  return result.meta.last_row_id as number;
+}
+
+export async function atualizarSiteProspectado(
+  id: number,
+  input: SiteProspectadoInput,
+  usuarioId: number
+): Promise<void> {
+  const atual = await getSiteProspectado(id);
+  if (!atual) throw new Error('Site prospectado não encontrado');
+
+  await db()
+    .prepare(
+      `UPDATE sites_prospectados
+          SET url_site = ?, domain_rating = ?, trafego_estimado = ?, nicho = ?, canal = ?, tipo_contato = ?,
+              status = ?, num_tentativas = ?, data_contato = ?, link_email = ?,
+              valor_solicitado_white_centavos = ?, valor_solicitado_black_centavos = ?,
+              valor_fechado_white_centavos = ?, valor_fechado_black_centavos = ?, valor_fechado_insercao_centavos = ?,
+              aceita_insercao = ?, aceita_pacote = ?, administra_outros_sites = ?, outros_sites_urls = ?,
+              dentro_tabela_precos = ?, observacoes = ?, responsavel_id = ?, atualizado_em = datetime('now')
+        WHERE id = ?`
+    )
+    .bind(
+      input.url_site,
+      input.domain_rating,
+      input.trafego_estimado,
+      input.nicho,
+      input.canal,
+      input.tipo_contato,
+      input.status,
+      input.num_tentativas,
+      input.data_contato,
+      input.link_email,
+      input.valor_solicitado_white_centavos,
+      input.valor_solicitado_black_centavos,
+      input.valor_fechado_white_centavos,
+      input.valor_fechado_black_centavos,
+      input.valor_fechado_insercao_centavos,
+      input.aceita_insercao,
+      input.aceita_pacote,
+      input.administra_outros_sites,
+      input.outros_sites_urls,
+      input.dentro_tabela_precos,
+      input.observacoes,
+      input.responsavel_id,
+      id
+    )
+    .run();
+
+  await registrarHistorico(
+    'sites_prospectados',
+    id,
+    usuarioId,
+    atual as unknown as Record<string, unknown>,
+    input as unknown as Record<string, unknown>
+  );
+}
+
+export async function deletarSiteProspectado(id: number): Promise<void> {
+  await db().prepare('DELETE FROM sites_prospectados WHERE id = ?').bind(id).run();
+}
+
+export interface PainelSemanalSemana {
+  semana: string;
+  total: number;
+  aguardando: number;
+  respondentes: number;
+  via_whatsapp: number;
+  via_email: number;
+  followups: number;
+  sites_fechados: number;
+  novos_sites_derivados: number;
+  taxa_resposta: number | null;
+  taxa_negociacao: number | null;
+  taxa_fechamento_contatados: number | null;
+  taxa_fechamento_respondentes: number | null;
+  taxa_recusa: number | null;
+  valor_medio_white_centavos: number | null;
+  valor_medio_black_centavos: number | null;
+  valor_medio_insercao_centavos: number | null;
+  pct_aceita_insercao: number | null;
+  pct_administra_outros_sites: number | null;
+  pct_dentro_tabela_precos: number | null;
+  pct_pacote_fechado: number | null;
+  pct_perguntou_insercao: number | null;
+  pct_perguntou_outros_dominios: number | null;
+}
+
+export async function listPainelSemanal(): Promise<PainelSemanalSemana[]> {
+  const { results } = await db()
+    .prepare('SELECT * FROM v_prospeccao_semanal ORDER BY semana DESC')
+    .all<PainelSemanalSemana>();
+  return results;
+}
+
+export interface OverviewVolume {
+  sites_contatados_total: number;
+  sites_contatados_media_semana: number | null;
+  sites_contatados_semana_atual: number;
+  contatos_whatsapp_total: number;
+  contatos_whatsapp_media_semana: number | null;
+  contatos_whatsapp_semana_atual: number;
+  contatos_email_total: number;
+  contatos_email_media_semana: number | null;
+  contatos_email_semana_atual: number;
+  followups_total: number;
+  followups_media_semana: number | null;
+  followups_semana_atual: number;
+}
+
+export async function getProspeccaoOverviewVolume(): Promise<OverviewVolume> {
+  const row = await db().prepare('SELECT * FROM v_prospeccao_overview_volume').first<OverviewVolume>();
+  return (
+    row ?? {
+      sites_contatados_total: 0,
+      sites_contatados_media_semana: null,
+      sites_contatados_semana_atual: 0,
+      contatos_whatsapp_total: 0,
+      contatos_whatsapp_media_semana: null,
+      contatos_whatsapp_semana_atual: 0,
+      contatos_email_total: 0,
+      contatos_email_media_semana: null,
+      contatos_email_semana_atual: 0,
+      followups_total: 0,
+      followups_media_semana: null,
+      followups_semana_atual: 0
+    }
+  );
+}
+
+export interface OverviewConversao {
+  taxa_resposta_total: number | null;
+  taxa_resposta_media_semana: number | null;
+  taxa_resposta_semana_atual: number | null;
+  taxa_negociacao_total: number | null;
+  taxa_negociacao_media_semana: number | null;
+  taxa_negociacao_semana_atual: number | null;
+  taxa_fechamento_contatados_total: number | null;
+  taxa_fechamento_contatados_media_semana: number | null;
+  taxa_fechamento_contatados_semana_atual: number | null;
+  taxa_fechamento_respondentes_total: number | null;
+  taxa_fechamento_respondentes_media_semana: number | null;
+  taxa_fechamento_respondentes_semana_atual: number | null;
+  taxa_recusa_total: number | null;
+  taxa_recusa_media_semana: number | null;
+  taxa_recusa_semana_atual: number | null;
+}
+
+export async function getProspeccaoOverviewConversao(): Promise<OverviewConversao> {
+  const row = await db().prepare('SELECT * FROM v_prospeccao_overview_conversao').first<OverviewConversao>();
+  return (
+    row ?? {
+      taxa_resposta_total: null,
+      taxa_resposta_media_semana: null,
+      taxa_resposta_semana_atual: null,
+      taxa_negociacao_total: null,
+      taxa_negociacao_media_semana: null,
+      taxa_negociacao_semana_atual: null,
+      taxa_fechamento_contatados_total: null,
+      taxa_fechamento_contatados_media_semana: null,
+      taxa_fechamento_contatados_semana_atual: null,
+      taxa_fechamento_respondentes_total: null,
+      taxa_fechamento_respondentes_media_semana: null,
+      taxa_fechamento_respondentes_semana_atual: null,
+      taxa_recusa_total: null,
+      taxa_recusa_media_semana: null,
+      taxa_recusa_semana_atual: null
+    }
+  );
+}
+
+export interface OverviewComercial {
+  sites_fechados_geral: number;
+  sites_fechados_ultima_semana: number;
+  sites_fechados_semana_atual: number;
+  valor_medio_white_geral: number | null;
+  valor_medio_white_ultima_semana: number | null;
+  valor_medio_white_semana_atual: number | null;
+  valor_medio_black_geral: number | null;
+  valor_medio_black_ultima_semana: number | null;
+  valor_medio_black_semana_atual: number | null;
+  valor_medio_insercao_geral: number | null;
+  valor_medio_insercao_ultima_semana: number | null;
+  valor_medio_insercao_semana_atual: number | null;
+  pct_aceita_insercao_geral: number | null;
+  pct_aceita_insercao_ultima_semana: number | null;
+  pct_aceita_insercao_semana_atual: number | null;
+  pct_administra_outros_geral: number | null;
+  pct_administra_outros_ultima_semana: number | null;
+  pct_administra_outros_semana_atual: number | null;
+  novos_sites_derivados_geral: number;
+  novos_sites_derivados_ultima_semana: number;
+  novos_sites_derivados_semana_atual: number;
+}
+
+export async function getProspeccaoOverviewComercial(): Promise<OverviewComercial> {
+  const row = await db().prepare('SELECT * FROM v_prospeccao_overview_comercial').first<OverviewComercial>();
+  return (
+    row ?? {
+      sites_fechados_geral: 0,
+      sites_fechados_ultima_semana: 0,
+      sites_fechados_semana_atual: 0,
+      valor_medio_white_geral: null,
+      valor_medio_white_ultima_semana: null,
+      valor_medio_white_semana_atual: null,
+      valor_medio_black_geral: null,
+      valor_medio_black_ultima_semana: null,
+      valor_medio_black_semana_atual: null,
+      valor_medio_insercao_geral: null,
+      valor_medio_insercao_ultima_semana: null,
+      valor_medio_insercao_semana_atual: null,
+      pct_aceita_insercao_geral: null,
+      pct_aceita_insercao_ultima_semana: null,
+      pct_aceita_insercao_semana_atual: null,
+      pct_administra_outros_geral: null,
+      pct_administra_outros_ultima_semana: null,
+      pct_administra_outros_semana_atual: null,
+      novos_sites_derivados_geral: 0,
+      novos_sites_derivados_ultima_semana: 0,
+      novos_sites_derivados_semana_atual: 0
+    }
+  );
+}
+
+export interface OverviewQualidade {
+  pct_dentro_tabela_total: number | null;
+  pct_dentro_tabela_media_semana: number | null;
+  pct_dentro_tabela_semana_atual: number | null;
+  pct_pacote_fechado_total: number | null;
+  pct_pacote_fechado_media_semana: number | null;
+  pct_pacote_fechado_semana_atual: number | null;
+  pct_perguntou_insercao_total: number | null;
+  pct_perguntou_insercao_media_semana: number | null;
+  pct_perguntou_insercao_semana_atual: number | null;
+  pct_perguntou_outros_total: number | null;
+  pct_perguntou_outros_media_semana: number | null;
+  pct_perguntou_outros_semana_atual: number | null;
+}
+
+export async function getProspeccaoOverviewQualidade(): Promise<OverviewQualidade> {
+  const row = await db().prepare('SELECT * FROM v_prospeccao_overview_qualidade').first<OverviewQualidade>();
+  return (
+    row ?? {
+      pct_dentro_tabela_total: null,
+      pct_dentro_tabela_media_semana: null,
+      pct_dentro_tabela_semana_atual: null,
+      pct_pacote_fechado_total: null,
+      pct_pacote_fechado_media_semana: null,
+      pct_pacote_fechado_semana_atual: null,
+      pct_perguntou_insercao_total: null,
+      pct_perguntou_insercao_media_semana: null,
+      pct_perguntou_insercao_semana_atual: null,
+      pct_perguntou_outros_total: null,
+      pct_perguntou_outros_media_semana: null,
+      pct_perguntou_outros_semana_atual: null
+    }
+  );
+}
+
+// ---------- Tabela de Preços (Prospecção de Sites) ----------
+
+export async function listTabelaPrecoFaixas(): Promise<TabelaPrecoFaixa[]> {
+  const { results } = await db()
+    .prepare('SELECT * FROM tabela_precos_faixas ORDER BY ordem')
+    .all<TabelaPrecoFaixa>();
+  return results;
+}
+
+export async function getTabelaPrecoFaixa(id: number): Promise<TabelaPrecoFaixa | null> {
+  const row = await db().prepare('SELECT * FROM tabela_precos_faixas WHERE id = ?').bind(id).first<TabelaPrecoFaixa>();
+  return row ?? null;
+}
+
+export interface TabelaPrecoFaixaInput {
+  ordem: number;
+  dr_min: number;
+  dr_max: number | null;
+  trafego_min: number | null;
+  trafego_max: number | null;
+  valor_min_centavos: number;
+  valor_max_centavos: number;
+  observacao: string | null;
+}
+
+export async function atualizarTabelaPrecoFaixa(
+  id: number,
+  input: TabelaPrecoFaixaInput,
+  usuarioId: number
+): Promise<void> {
+  const atual = await getTabelaPrecoFaixa(id);
+  if (!atual) throw new Error('Faixa de preço não encontrada');
+
+  await db()
+    .prepare(
+      `UPDATE tabela_precos_faixas
+          SET ordem = ?, dr_min = ?, dr_max = ?, trafego_min = ?, trafego_max = ?,
+              valor_min_centavos = ?, valor_max_centavos = ?, observacao = ?
+        WHERE id = ?`
+    )
+    .bind(
+      input.ordem,
+      input.dr_min,
+      input.dr_max,
+      input.trafego_min,
+      input.trafego_max,
+      input.valor_min_centavos,
+      input.valor_max_centavos,
+      input.observacao,
+      id
+    )
+    .run();
+
+  await registrarHistorico(
+    'tabela_precos_faixas',
+    id,
+    usuarioId,
+    atual as unknown as Record<string, unknown>,
+    input as unknown as Record<string, unknown>
+  );
+}
+
+export async function listTabelaPrecoRedFlags(): Promise<TabelaPrecoRedFlag[]> {
+  const { results } = await db()
+    .prepare('SELECT * FROM tabela_precos_red_flags ORDER BY ordem')
+    .all<TabelaPrecoRedFlag>();
+  return results;
+}
+
+export async function getTabelaPrecoRedFlag(id: number): Promise<TabelaPrecoRedFlag | null> {
+  const row = await db()
+    .prepare('SELECT * FROM tabela_precos_red_flags WHERE id = ?')
+    .bind(id)
+    .first<TabelaPrecoRedFlag>();
+  return row ?? null;
+}
+
+export interface TabelaPrecoRedFlagInput {
+  ordem: number;
+  sinal_de_alerta: string;
+  possivel_causa: string;
+}
+
+export async function atualizarTabelaPrecoRedFlag(
+  id: number,
+  input: TabelaPrecoRedFlagInput,
+  usuarioId: number
+): Promise<void> {
+  const atual = await getTabelaPrecoRedFlag(id);
+  if (!atual) throw new Error('Red flag não encontrada');
+
+  await db()
+    .prepare('UPDATE tabela_precos_red_flags SET ordem = ?, sinal_de_alerta = ?, possivel_causa = ? WHERE id = ?')
+    .bind(input.ordem, input.sinal_de_alerta, input.possivel_causa, id)
+    .run();
+
+  await registrarHistorico(
+    'tabela_precos_red_flags',
+    id,
+    usuarioId,
+    atual as unknown as Record<string, unknown>,
+    input as unknown as Record<string, unknown>
+  );
 }

@@ -18,7 +18,16 @@ const CLASSES: Record<string, string> = {
   em_andamento: 'bg-blue-100 text-blue-700',
   converteu_em_venda: 'bg-emerald-100 text-emerald-700',
   nao_teve_interesse: 'bg-red-100 text-red-700',
-  completo: 'bg-emerald-100 text-emerald-800'
+  completo: 'bg-emerald-100 text-emerald-800',
+
+  // status sites_prospectados
+  nao_contatado: 'bg-slate-100 text-slate-600',
+  contatado_aguardando_resposta: 'bg-blue-100 text-blue-700',
+  em_negociacao: 'bg-amber-100 text-amber-700',
+  proposta_enviada: 'bg-violet-100 text-violet-700',
+  fechado: 'bg-emerald-100 text-emerald-700',
+  sem_interesse: 'bg-red-100 text-red-700',
+  sem_resposta_followup: 'bg-orange-100 text-orange-700'
 };
 
 export function badgeClasses(value: string): string {

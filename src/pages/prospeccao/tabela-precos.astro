@@ -1,0 +1,185 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ErrorBanner from '../../components/ErrorBanner.astro';
+import { listTabelaPrecoFaixas, listTabelaPrecoRedFlags } from '../../lib/db';
+import { centavosParaReais } from '../../lib/types';
+
+const usuario = Astro.locals.usuario;
+const erro = Astro.url.searchParams.get('erro');
+const isAdmin = usuario.papel === 'admin';
+
+const [faixas, redFlags] = await Promise.all([listTabelaPrecoFaixas(), listTabelaPrecoRedFlags()]);
+
+function faixaTexto(min: number, max: number | null): string {
+  return max === null ? `${min}+` : `${min}–${max}`;
+}
+---
+
+<Layout title="Tabela de Preços" usuario={usuario}>
+  <h1 class="mb-6">Tabela de Preços</h1>
+
+  <ErrorBanner mensagem={erro} />
+
+  <section class="card overflow-x-auto">
+    <h2>Faixas de Preço</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          {isAdmin && <th></th>}
+          <th>DR</th>
+          <th>Search Traffic</th>
+          <th>Faixa de Valor Ideal</th>
+          <th>Observação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          faixas.map((f) => (
+            <tr>
+              {isAdmin && (
+                <td>
+                  <details class="relative">
+                    <summary
+                      class="cursor-pointer list-none rounded px-1.5 py-0.5 leading-none text-slate-400 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                      aria-label="Editar faixa"
+                    >
+                      ⋮
+                    </summary>
+                    <div class="absolute left-0 z-10 mt-1 w-80 rounded-md border border-slate-300 bg-slate-100 p-3 shadow-lg">
+                      <form method="post" action={`/api/prospeccao/tabela-precos/faixas/${f.id}`} class="flex flex-col gap-2">
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <label for={`ordem-${f.id}`}>Ordem</label>
+                            <input type="number" id={`ordem-${f.id}`} name="ordem" min="0" step="1" value={f.ordem} required />
+                          </div>
+                          <div>
+                            <label for={`dr_min-${f.id}`}>DR mín.</label>
+                            <input type="number" id={`dr_min-${f.id}`} name="dr_min" min="0" step="1" value={f.dr_min} required />
+                          </div>
+                          <div>
+                            <label for={`dr_max-${f.id}`}>DR máx. (vazio = sem teto)</label>
+                            <input type="number" id={`dr_max-${f.id}`} name="dr_max" min="0" step="1" value={f.dr_max ?? ''} />
+                          </div>
+                          <div>
+                            <label for={`trafego_min-${f.id}`}>Tráfego mín.</label>
+                            <input type="number" id={`trafego_min-${f.id}`} name="trafego_min" min="0" step="1" value={f.trafego_min ?? ''} />
+                          </div>
+                          <div>
+                            <label for={`trafego_max-${f.id}`}>Tráfego máx. (vazio = sem teto)</label>
+                            <input type="number" id={`trafego_max-${f.id}`} name="trafego_max" min="0" step="1" value={f.trafego_max ?? ''} />
+                          </div>
+                          <div>
+                            <label for={`valor_min-${f.id}`}>Valor mín. (R$)</label>
+                            <input
+                              type="number"
+                              id={`valor_min-${f.id}`}
+                              name="valor_min_reais"
+                              min="0"
+                              step="0.01"
+                              value={(f.valor_min_centavos / 100).toFixed(2)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label for={`valor_max-${f.id}`}>Valor máx. (R$)</label>
+                            <input
+                              type="number"
+                              id={`valor_max-${f.id}`}
+                              name="valor_max_reais"
+                              min="0"
+                              step="0.01"
+                              value={(f.valor_max_centavos / 100).toFixed(2)}
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label for={`observacao-${f.id}`}>Observação</label>
+                          <input type="text" id={`observacao-${f.id}`} name="observacao" value={f.observacao ?? ''} />
+                        </div>
+                        <button type="submit" class="btn-primary mt-1">
+                          Salvar
+                        </button>
+                      </form>
+                    </div>
+                  </details>
+                </td>
+              )}
+              <td class="font-medium text-slate-900">{faixaTexto(f.dr_min, f.dr_max)}</td>
+              <td>{f.trafego_min !== null || f.trafego_max !== null ? faixaTexto(f.trafego_min ?? 0, f.trafego_max) : '—'}</td>
+              <td>
+                {centavosParaReais(f.valor_min_centavos)} – {centavosParaReais(f.valor_max_centavos)}
+              </td>
+              <td>{f.observacao ?? '—'}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+
+    <div class="mt-4 flex flex-col gap-1 text-xs text-slate-500">
+      <p>
+        Subdomínios → usar faixa uma linha acima do que o DR indicaria. Ex: dropsdejogos.uai.com.br — DR 73, ST
+        29.000 → cobrado R$ 200 (faixa 40–60, não 60–80).
+      </p>
+      <p>
+        DR alto + tráfego muito baixo → usar faixa uma linha acima. Ex: mundorh.com.br — DR 65, ST 2.800 → cobrado
+        R$ 150 (faixa 25–40, não 40–60).
+      </p>
+    </div>
+  </section>
+
+  <section class="mt-6 card overflow-x-auto">
+    <h2>Red Flags</h2>
+    <table class="mt-3">
+      <thead>
+        <tr>
+          {isAdmin && <th></th>}
+          <th>Sinal de Alerta</th>
+          <th>Possível Causa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          redFlags.map((r) => (
+            <tr>
+              {isAdmin && (
+                <td>
+                  <details class="relative">
+                    <summary
+                      class="cursor-pointer list-none rounded px-1.5 py-0.5 leading-none text-slate-400 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                      aria-label="Editar red flag"
+                    >
+                      ⋮
+                    </summary>
+                    <div class="absolute left-0 z-10 mt-1 w-80 rounded-md border border-slate-300 bg-slate-100 p-3 shadow-lg">
+                      <form method="post" action={`/api/prospeccao/tabela-precos/red-flags/${r.id}`} class="flex flex-col gap-2">
+                        <div>
+                          <label for={`ordem-rf-${r.id}`}>Ordem</label>
+                          <input type="number" id={`ordem-rf-${r.id}`} name="ordem" min="0" step="1" value={r.ordem} required />
+                        </div>
+                        <div>
+                          <label for={`sinal-${r.id}`}>Sinal de Alerta</label>
+                          <input type="text" id={`sinal-${r.id}`} name="sinal_de_alerta" value={r.sinal_de_alerta} required />
+                        </div>
+                        <div>
+                          <label for={`causa-${r.id}`}>Possível Causa</label>
+                          <input type="text" id={`causa-${r.id}`} name="possivel_causa" value={r.possivel_causa} required />
+                        </div>
+                        <button type="submit" class="btn-primary mt-1">
+                          Salvar
+                        </button>
+                      </form>
+                    </div>
+                  </details>
+                </td>
+              )}
+              <td class="font-medium text-slate-900">{r.sinal_de_alerta}</td>
+              <td>{r.possivel_causa}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+</Layout>

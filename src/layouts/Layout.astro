@@ -9,11 +9,31 @@ interface Props {
 
 const { title, usuario } = Astro.props;
 
-const links = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/pedidos', label: 'Pedidos' },
-  { href: '/comercial', label: 'Ações Comerciais' },
-  { href: '/clientes', label: 'Clientes' }
+const gruposNav = [
+  {
+    label: 'Comercial',
+    links: [
+      { href: '/', label: 'Dashboard' },
+      { href: '/pedidos', label: 'Pedidos' },
+      { href: '/comercial', label: 'Ações Comerciais' },
+      { href: '/clientes', label: 'Clientes' }
+    ]
+  },
+  {
+    label: 'Prospecção de Sites',
+    links: [
+      { href: '/prospeccao', label: 'Overview' },
+      { href: '/prospeccao/sites', label: 'Registro de Sites' },
+      { href: '/prospeccao/painel-semanal', label: 'Painel Semanal' },
+      { href: '/prospeccao/tabela-precos', label: 'Tabela de Preços' }
+    ]
+  }
+];
+
+const linksAdmin = [
+  { href: '/admin/importar', label: 'Importar' },
+  { href: '/admin/exportar', label: 'Exportar' },
+  { href: '/admin/usuarios', label: 'Usuários' }
 ];
 ---
 
@@ -33,43 +53,43 @@ const links = [
         <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <nav class="flex gap-1">
             {
-              links.map((link) => (
-                <a
-                  href={link.href}
-                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
-                >
-                  {link.label}
-                </a>
+              gruposNav.map((grupo) => (
+                <details name="nav-grupo" class="relative">
+                  <summary
+                    class="cursor-pointer list-none rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                  >
+                    {grupo.label}
+                  </summary>
+                  <div class="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md border border-slate-300 bg-white py-1 shadow-lg">
+                    {
+                      grupo.links.map((link) => (
+                        <a href={link.href} class="block px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+                          {link.label}
+                        </a>
+                      ))
+                    }
+                  </div>
+                </details>
               ))
             }
             {
               usuario.papel === 'admin' && (
-                <a
-                  href="/admin/importar"
-                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
-                >
-                  Importar
-                </a>
-              )
-            }
-            {
-              usuario.papel === 'admin' && (
-                <a
-                  href="/admin/exportar"
-                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
-                >
-                  Exportar
-                </a>
-              )
-            }
-            {
-              usuario.papel === 'admin' && (
-                <a
-                  href="/admin/usuarios"
-                  class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white"
-                >
-                  Usuários
-                </a>
+                <details name="nav-grupo" class="relative">
+                  <summary
+                    class="cursor-pointer list-none rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                  >
+                    Admin
+                  </summary>
+                  <div class="absolute left-0 z-10 mt-1 min-w-[10rem] rounded-md border border-slate-300 bg-white py-1 shadow-lg">
+                    {
+                      linksAdmin.map((link) => (
+                        <a href={link.href} class="block px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+                          {link.label}
+                        </a>
+                      ))
+                    }
+                  </div>
+                </details>
               )
             }
           </nav>
