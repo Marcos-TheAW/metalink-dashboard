@@ -20,6 +20,9 @@ jobs:
       - name: Instalar dependências
         run: bun install --frozen-lockfile
 
+      - name: Gerar tipos do binding do Worker (worker-configuration.d.ts)
+        run: bun run generate-types
+
       - name: Checar tipos
         run: bunx astro-check
 
