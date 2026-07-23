@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { processarImportacaoXlsx, type ResultadoImportacao } from '../../lib/importacao';
+import { processarImportacaoSitesCsv, type ResultadoImportacaoSites } from '../../lib/importacaoSites';
 
 const usuario = Astro.locals.usuario;
 
@@ -9,151 +10,230 @@ if (usuario.papel !== 'admin') {
   return new Response('Acesso restrito a administradores.', { status: 403 });
 }
 
-let resultado: ResultadoImportacao | null = null;
-let erro: string | null = null;
+let resultadoComercial: ResultadoImportacao | null = null;
+let erroComercial: string | null = null;
+let resultadoSites: ResultadoImportacaoSites | null = null;
+let erroSites: string | null = null;
 
 if (Astro.request.method === 'POST') {
-  try {
-    const form = await Astro.request.formData();
-    const arquivo = form.get('arquivo');
-    if (!(arquivo instanceof File) || arquivo.size === 0) {
-      erro = 'Selecione um arquivo .xlsx antes de enviar.';
-    } else {
-      const buffer = await arquivo.arrayBuffer();
-      resultado = await processarImportacaoXlsx(buffer, usuario.id);
+  const form = await Astro.request.formData();
+  const tipo = String(form.get('tipo') ?? '');
+
+  if (tipo === 'sites') {
+    try {
+      const arquivo = form.get('arquivo_sites');
+      if (!(arquivo instanceof File) || arquivo.size === 0) {
+        erroSites = 'Selecione um arquivo .csv antes de enviar.';
+      } else {
+        const conteudo = await arquivo.text();
+        resultadoSites = await processarImportacaoSitesCsv(conteudo, usuario.id);
+      }
+    } catch (e) {
+      erroSites = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
     }
-  } catch (e) {
-    erro = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
+  } else if (tipo === 'comercial') {
+    try {
+      const arquivo = form.get('arquivo_comercial');
+      if (!(arquivo instanceof File) || arquivo.size === 0) {
+        erroComercial = 'Selecione um arquivo .xlsx antes de enviar.';
+      } else {
+        const buffer = await arquivo.arrayBuffer();
+        resultadoComercial = await processarImportacaoXlsx(buffer, usuario.id);
+      }
+    } catch (e) {
+      erroComercial = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
+    }
   }
 }
 ---
 
-<Layout title="Importar planilha" usuario={usuario}>
-  <h1 class="mb-6">Importar planilha</h1>
+<Layout title="Importar" usuario={usuario}>
+  <h1 class="mb-6">Importar</h1>
 
-  <div class="card max-w-2xl">
-    <p class="text-sm text-slate-600">
-      Envie o arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> original (o
-      mesmo formato exportado em <a href="/admin/exportar" class="text-brand-600 hover:underline">Exportar</a>).
-      Abas reconhecidas: <strong>Clientes</strong>, <strong>Pedidos</strong> e
-      <strong>Ações Comerciais</strong> — pode enviar só algumas, não precisa ter as três.
-      Clientes citados em Pedidos ou Ações que ainda não existem são cadastrados automaticamente.
-      Linhas com cliente/canal/status/data/valor que não batem com o esperado são puladas e listadas
-      abaixo, sem interromper o resto da importação.
-    </p>
+  <div class="flex flex-col gap-8">
+    <section class="card max-w-2xl">
+      <h2>Registro de Sites (Prospecção)</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Envie um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.csv</code> com os novos contatos
+        de sites parceiros. As colunas precisam seguir exatamente a ordem do modelo — baixe e preencha a
+        partir dele, sem reordenar ou remover colunas.
+      </p>
+      <a href="/api/prospeccao/sites/modelo" class="btn-secondary mt-3 inline-flex">Baixar modelo .csv</a>
 
-    <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-      <div class="flex-1">
-        <label for="arquivo">Arquivo .xlsx</label>
-        <input type="file" id="arquivo" name="arquivo" accept=".xlsx" required />
-      </div>
-      <button type="submit" class="btn-primary">Importar</button>
-    </form>
-  </div>
-
-  {
-    erro && (
-      <div class="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        {erro}
-      </div>
-    )
-  }
-
-  {
-    resultado && (
-      <div class="mt-6 flex flex-col gap-4">
-        <div class="card">
-          <h2>Resumo</h2>
-          <p class="mt-2 text-sm text-slate-600">
-            Abas encontradas: {resultado.planilhasEncontradas.join(', ')}
-          </p>
-          <dl class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
-              <dt class="text-xs uppercase tracking-wide text-slate-500">Clientes processados</dt>
-              <dd class="text-xl font-semibold">{resultado.clientesProcessados}</dd>
-            </div>
-            <div>
-              <dt class="text-xs uppercase tracking-wide text-slate-500">Pedidos inseridos</dt>
-              <dd class="text-xl font-semibold">{resultado.pedidosInseridos}</dd>
-            </div>
-            <div>
-              <dt class="text-xs uppercase tracking-wide text-slate-500">Ações inseridas</dt>
-              <dd class="text-xl font-semibold">{resultado.acoesInseridas}</dd>
-            </div>
-            <div>
-              <dt class="text-xs uppercase tracking-wide text-slate-500">Linhas ignoradas</dt>
-              <dd class="text-xl font-semibold">
-                {resultado.pedidosIgnorados.length + resultado.acoesIgnoradas.length}
-              </dd>
-            </div>
-          </dl>
+      <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <input type="hidden" name="tipo" value="sites" />
+        <div class="flex-1">
+          <label for="arquivo_sites">Arquivo .csv</label>
+          <input type="file" id="arquivo_sites" name="arquivo_sites" accept=".csv" required />
         </div>
+        <button type="submit" class="btn-primary">Importar sites</button>
+      </form>
 
-        <div class="card">
-          <h2>Colunas detectadas por aba</h2>
-          <p class="mt-1 text-xs text-slate-500">
-            Confira se batem com os nomes esperados (Cliente, Canal de Origem, Status do Pedido...).
-            Coluna com nome diferente do esperado faz a linha inteira ser ignorada.
-          </p>
-          <div class="mt-3 flex flex-col gap-3">
-            {Object.entries(resultado.cabecalhosDetectados).map(([aba, colunas]) => (
-              <div>
-                <div class="text-sm font-medium text-slate-700">{aba}</div>
-                <div class="mt-1 flex flex-wrap gap-1.5">
-                  {colunas.map((coluna) => (
-                    <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{coluna}</span>
-                  ))}
-                  {colunas.length === 0 && <span class="text-xs text-slate-400">(nenhuma coluna detectada)</span>}
-                </div>
+      {
+        erroSites && (
+          <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {erroSites}
+          </div>
+        )
+      }
+
+      {
+        resultadoSites && (
+          <div class="mt-4 flex flex-col gap-4">
+            <div class="rounded-md border border-brand-500 bg-brand-500/10 px-4 py-3 text-sm text-white">
+              <strong>{resultadoSites.inseridos}</strong> site(s) importado(s), {resultadoSites.ignorados.length} linha(s) ignorada(s).
+            </div>
+            {resultadoSites.ignorados.length > 0 && (
+              <div class="overflow-x-auto">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Linha no arquivo</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultadoSites.ignorados.map((item) => (
+                      <tr>
+                        <td>{item.linha}</td>
+                        <td>{item.motivo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
+            )}
           </div>
+        )
+      }
+    </section>
+
+    <section class="card max-w-2xl">
+      <h2>Comercial (Clientes, Pedidos, Ações Comerciais)</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Envie o arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> original (o
+        mesmo formato exportado em <a href="/admin/exportar" class="text-brand-600 hover:underline">Exportar</a>).
+        Abas reconhecidas: <strong>Clientes</strong>, <strong>Pedidos</strong> e
+        <strong>Ações Comerciais</strong> — pode enviar só algumas, não precisa ter as três.
+        Clientes citados em Pedidos ou Ações que ainda não existem são cadastrados automaticamente.
+        Linhas com cliente/canal/status/data/valor que não batem com o esperado são puladas e listadas
+        abaixo, sem interromper o resto da importação.
+      </p>
+
+      <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <input type="hidden" name="tipo" value="comercial" />
+        <div class="flex-1">
+          <label for="arquivo_comercial">Arquivo .xlsx</label>
+          <input type="file" id="arquivo_comercial" name="arquivo_comercial" accept=".xlsx" required />
         </div>
+        <button type="submit" class="btn-primary">Importar</button>
+      </form>
 
-        {resultado.pedidosIgnorados.length > 0 && (
-          <div class="card">
-            <h2>Pedidos ignorados</h2>
-            <table class="mt-3">
-              <thead>
-                <tr>
-                  <th>Linha na planilha</th>
-                  <th>Motivo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resultado.pedidosIgnorados.map((item) => (
-                  <tr>
-                    <td>{item.linha}</td>
-                    <td>{item.motivo}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {
+        erroComercial && (
+          <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {erroComercial}
           </div>
-        )}
+        )
+      }
 
-        {resultado.acoesIgnoradas.length > 0 && (
-          <div class="card">
-            <h2>Ações comerciais ignoradas</h2>
-            <table class="mt-3">
-              <thead>
-                <tr>
-                  <th>Linha na planilha</th>
-                  <th>Motivo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resultado.acoesIgnoradas.map((item) => (
-                  <tr>
-                    <td>{item.linha}</td>
-                    <td>{item.motivo}</td>
-                  </tr>
+      {
+        resultadoComercial && (
+          <div class="mt-4 flex flex-col gap-4">
+            <div>
+              <h2>Resumo</h2>
+              <p class="mt-2 text-sm text-slate-600">
+                Abas encontradas: {resultadoComercial.planilhasEncontradas.join(', ')}
+              </p>
+              <dl class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Clientes processados</dt>
+                  <dd class="text-xl font-semibold">{resultadoComercial.clientesProcessados}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Pedidos inseridos</dt>
+                  <dd class="text-xl font-semibold">{resultadoComercial.pedidosInseridos}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Ações inseridas</dt>
+                  <dd class="text-xl font-semibold">{resultadoComercial.acoesInseridas}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Linhas ignoradas</dt>
+                  <dd class="text-xl font-semibold">
+                    {resultadoComercial.pedidosIgnorados.length + resultadoComercial.acoesIgnoradas.length}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <div>
+              <h2>Colunas detectadas por aba</h2>
+              <p class="mt-1 text-xs text-slate-500">
+                Confira se batem com os nomes esperados (Cliente, Canal de Origem, Status do Pedido...).
+                Coluna com nome diferente do esperado faz a linha inteira ser ignorada.
+              </p>
+              <div class="mt-3 flex flex-col gap-3">
+                {Object.entries(resultadoComercial.cabecalhosDetectados).map(([aba, colunas]) => (
+                  <div>
+                    <div class="text-sm font-medium text-slate-700">{aba}</div>
+                    <div class="mt-1 flex flex-wrap gap-1.5">
+                      {colunas.map((coluna) => (
+                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{coluna}</span>
+                      ))}
+                      {colunas.length === 0 && <span class="text-xs text-slate-400">(nenhuma coluna detectada)</span>}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            {resultadoComercial.pedidosIgnorados.length > 0 && (
+              <div>
+                <h2>Pedidos ignorados</h2>
+                <table class="mt-3">
+                  <thead>
+                    <tr>
+                      <th>Linha na planilha</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultadoComercial.pedidosIgnorados.map((item) => (
+                      <tr>
+                        <td>{item.linha}</td>
+                        <td>{item.motivo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {resultadoComercial.acoesIgnoradas.length > 0 && (
+              <div>
+                <h2>Ações comerciais ignoradas</h2>
+                <table class="mt-3">
+                  <thead>
+                    <tr>
+                      <th>Linha na planilha</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultadoComercial.acoesIgnoradas.map((item) => (
+                      <tr>
+                        <td>{item.linha}</td>
+                        <td>{item.motivo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    )
-  }
+        )
+      }
+    </section>
+  </div>
 </Layout>
