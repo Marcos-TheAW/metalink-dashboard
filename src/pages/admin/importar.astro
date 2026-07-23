@@ -1,6 +1,11 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { processarImportacaoXlsx, type ResultadoImportacao } from '../../lib/importacao';
+import {
+  processarImportacaoAcoesXlsx,
+  processarImportacaoPedidosXlsx,
+  type ResultadoImportacaoAcoes,
+  type ResultadoImportacaoPedidos
+} from '../../lib/importacao';
 import { processarImportacaoSitesXlsx, type ResultadoImportacaoSites } from '../../lib/importacaoSites';
 
 const usuario = Astro.locals.usuario;
@@ -10,10 +15,12 @@ if (usuario.papel !== 'admin') {
   return new Response('Acesso restrito a administradores.', { status: 403 });
 }
 
-let resultadoComercial: ResultadoImportacao | null = null;
-let erroComercial: string | null = null;
 let resultadoSites: ResultadoImportacaoSites | null = null;
 let erroSites: string | null = null;
+let resultadoPedidos: ResultadoImportacaoPedidos | null = null;
+let erroPedidos: string | null = null;
+let resultadoAcoes: ResultadoImportacaoAcoes | null = null;
+let erroAcoes: string | null = null;
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
@@ -31,17 +38,29 @@ if (Astro.request.method === 'POST') {
     } catch (e) {
       erroSites = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
     }
-  } else if (tipo === 'comercial') {
+  } else if (tipo === 'pedidos') {
     try {
-      const arquivo = form.get('arquivo_comercial');
+      const arquivo = form.get('arquivo_pedidos');
       if (!(arquivo instanceof File) || arquivo.size === 0) {
-        erroComercial = 'Selecione um arquivo .xlsx antes de enviar.';
+        erroPedidos = 'Selecione um arquivo .xlsx antes de enviar.';
       } else {
         const buffer = await arquivo.arrayBuffer();
-        resultadoComercial = await processarImportacaoXlsx(buffer, usuario.id);
+        resultadoPedidos = await processarImportacaoPedidosXlsx(buffer, usuario.id);
       }
     } catch (e) {
-      erroComercial = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
+      erroPedidos = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
+    }
+  } else if (tipo === 'acoes') {
+    try {
+      const arquivo = form.get('arquivo_acoes');
+      if (!(arquivo instanceof File) || arquivo.size === 0) {
+        erroAcoes = 'Selecione um arquivo .xlsx antes de enviar.';
+      } else {
+        const buffer = await arquivo.arrayBuffer();
+        resultadoAcoes = await processarImportacaoAcoesXlsx(buffer, usuario.id);
+      }
+    } catch (e) {
+      erroAcoes = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
     }
   }
 }
@@ -109,97 +128,49 @@ if (Astro.request.method === 'POST') {
     </section>
 
     <section class="card max-w-2xl">
-      <h2>Comercial (Clientes, Pedidos, Ações Comerciais)</h2>
+      <h2>Pedidos</h2>
       <p class="mt-2 text-sm text-slate-600">
-        Envie o arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> original (o
-        mesmo formato exportado em <a href="/admin/exportar" class="text-brand-600 hover:underline">Exportar</a>).
-        Abas reconhecidas: <strong>Clientes</strong>, <strong>Pedidos</strong> e
-        <strong>Ações Comerciais</strong> — pode enviar só algumas, não precisa ter as três.
-        Clientes citados em Pedidos ou Ações que ainda não existem são cadastrados automaticamente.
-        Linhas com cliente/canal/status/data/valor que não batem com o esperado são puladas e listadas
-        abaixo, sem interromper o resto da importação.
+        Envie um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com os pedidos.
+        Baixe o modelo abaixo, preencha os dados e faça o upload — os nomes das colunas precisam ficar
+        como estão no modelo (a ordem não importa, mas não renomeie os cabeçalhos). Clientes citados que
+        ainda não existem são cadastrados automaticamente.
       </p>
+      <a href="/api/admin/pedidos/modelo" class="btn-secondary mt-3 inline-flex">Baixar modelo .xlsx</a>
 
       <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <input type="hidden" name="tipo" value="comercial" />
+        <input type="hidden" name="tipo" value="pedidos" />
         <div class="flex-1">
-          <label for="arquivo_comercial">Arquivo .xlsx</label>
-          <input type="file" id="arquivo_comercial" name="arquivo_comercial" accept=".xlsx" required />
+          <label for="arquivo_pedidos">Arquivo .xlsx</label>
+          <input type="file" id="arquivo_pedidos" name="arquivo_pedidos" accept=".xlsx" required />
         </div>
-        <button type="submit" class="btn-primary">Importar</button>
+        <button type="submit" class="btn-primary">Importar pedidos</button>
       </form>
 
       {
-        erroComercial && (
+        erroPedidos && (
           <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {erroComercial}
+            {erroPedidos}
           </div>
         )
       }
 
       {
-        resultadoComercial && (
+        resultadoPedidos && (
           <div class="mt-4 flex flex-col gap-4">
-            <div>
-              <h2>Resumo</h2>
-              <p class="mt-2 text-sm text-slate-600">
-                Abas encontradas: {resultadoComercial.planilhasEncontradas.join(', ')}
-              </p>
-              <dl class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-slate-500">Clientes processados</dt>
-                  <dd class="text-xl font-semibold">{resultadoComercial.clientesProcessados}</dd>
-                </div>
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-slate-500">Pedidos inseridos</dt>
-                  <dd class="text-xl font-semibold">{resultadoComercial.pedidosInseridos}</dd>
-                </div>
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-slate-500">Ações inseridas</dt>
-                  <dd class="text-xl font-semibold">{resultadoComercial.acoesInseridas}</dd>
-                </div>
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-slate-500">Linhas ignoradas</dt>
-                  <dd class="text-xl font-semibold">
-                    {resultadoComercial.pedidosIgnorados.length + resultadoComercial.acoesIgnoradas.length}
-                  </dd>
-                </div>
-              </dl>
+            <div class="rounded-md border border-brand-500 bg-brand-500/10 px-4 py-3 text-sm text-white">
+              <strong>{resultadoPedidos.inseridos}</strong> pedido(s) importado(s), {resultadoPedidos.ignorados.length} linha(s) ignorada(s).
             </div>
-
-            <div>
-              <h2>Colunas detectadas por aba</h2>
-              <p class="mt-1 text-xs text-slate-500">
-                Confira se batem com os nomes esperados (Cliente, Canal de Origem, Status do Pedido...).
-                Coluna com nome diferente do esperado faz a linha inteira ser ignorada.
-              </p>
-              <div class="mt-3 flex flex-col gap-3">
-                {Object.entries(resultadoComercial.cabecalhosDetectados).map(([aba, colunas]) => (
-                  <div>
-                    <div class="text-sm font-medium text-slate-700">{aba}</div>
-                    <div class="mt-1 flex flex-wrap gap-1.5">
-                      {colunas.map((coluna) => (
-                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{coluna}</span>
-                      ))}
-                      {colunas.length === 0 && <span class="text-xs text-slate-400">(nenhuma coluna detectada)</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {resultadoComercial.pedidosIgnorados.length > 0 && (
-              <div>
-                <h2>Pedidos ignorados</h2>
-                <table class="mt-3">
+            {resultadoPedidos.ignorados.length > 0 && (
+              <div class="overflow-x-auto">
+                <table>
                   <thead>
                     <tr>
-                      <th>Linha na planilha</th>
+                      <th>Linha no arquivo</th>
                       <th>Motivo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {resultadoComercial.pedidosIgnorados.map((item) => (
+                    {resultadoPedidos.ignorados.map((item) => (
                       <tr>
                         <td>{item.linha}</td>
                         <td>{item.motivo}</td>
@@ -209,19 +180,56 @@ if (Astro.request.method === 'POST') {
                 </table>
               </div>
             )}
+          </div>
+        )
+      }
+    </section>
 
-            {resultadoComercial.acoesIgnoradas.length > 0 && (
-              <div>
-                <h2>Ações comerciais ignoradas</h2>
-                <table class="mt-3">
+    <section class="card max-w-2xl">
+      <h2>Ações Comerciais (Atividades Proativas)</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Envie um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com as ações
+        comerciais (follow-up, proposta, upsell, prospecção...). Baixe o modelo abaixo, preencha os
+        dados e faça o upload — os nomes das colunas precisam ficar como estão no modelo (a ordem não
+        importa, mas não renomeie os cabeçalhos). Clientes/prospects citados que ainda não existem são
+        cadastrados automaticamente.
+      </p>
+      <a href="/api/admin/acoes/modelo" class="btn-secondary mt-3 inline-flex">Baixar modelo .xlsx</a>
+
+      <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <input type="hidden" name="tipo" value="acoes" />
+        <div class="flex-1">
+          <label for="arquivo_acoes">Arquivo .xlsx</label>
+          <input type="file" id="arquivo_acoes" name="arquivo_acoes" accept=".xlsx" required />
+        </div>
+        <button type="submit" class="btn-primary">Importar ações</button>
+      </form>
+
+      {
+        erroAcoes && (
+          <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {erroAcoes}
+          </div>
+        )
+      }
+
+      {
+        resultadoAcoes && (
+          <div class="mt-4 flex flex-col gap-4">
+            <div class="rounded-md border border-brand-500 bg-brand-500/10 px-4 py-3 text-sm text-white">
+              <strong>{resultadoAcoes.inseridos}</strong> ação(ões) importada(s), {resultadoAcoes.ignorados.length} linha(s) ignorada(s).
+            </div>
+            {resultadoAcoes.ignorados.length > 0 && (
+              <div class="overflow-x-auto">
+                <table>
                   <thead>
                     <tr>
-                      <th>Linha na planilha</th>
+                      <th>Linha no arquivo</th>
                       <th>Motivo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {resultadoComercial.acoesIgnoradas.map((item) => (
+                    {resultadoAcoes.ignorados.map((item) => (
                       <tr>
                         <td>{item.linha}</td>
                         <td>{item.motivo}</td>

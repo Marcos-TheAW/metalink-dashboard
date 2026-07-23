@@ -156,15 +156,29 @@ using the `xlsx` (SheetJS) package with `XLSX.utils.aoa_to_sheet` — headers an
 **spreadsheet's** historical names (e.g. "Canal de Origem", "Status do Pedido"), not the DB's snake_case
 enum keys; values pass through `labelFor()` to convert back to human labels. The "Semana (segunda)"
 column is reconstructed from `data_pedido`/`data_acao` at export time (`segundaFeiraDaSemana()`) — it is
-never stored. There are two importers, both reverse-mapping labels back to enum values via the same
-`CANAIS`/`STATUS_PEDIDO`/etc. arrays: `/admin/importar` (in-app, admin-only, accepts the original
-`.xlsx` directly — parsing/upsert logic lives in `src/lib/importacao.ts`, which has D1 access via
-`cloudflare:workers` like the rest of the app) and `scripts/importar-planilha.ts` (CLI, CSV-only, shells
-out to `wrangler d1 execute --file=<generated .sql>` since a plain Bun script outside the Workers
-runtime has no `cloudflare:workers` binding access). Prefer pointing people at `/admin/importar` — it's
-the lower-friction path; the CLI script mainly exists for scripted/CI use. Money is `R$` strings/numbers
-at the spreadsheet boundary but always integer centavos inside the DB and app code — convert at the
-edges (`parseValorReais`, `centavosParaReais`), never carry floats through business logic.
+never stored.
+
+`/admin/importar` (in-app, admin-only) is the lower-friction import path and has one upload field per
+entity, each single-sheet `.xlsx` with its own "Baixar modelo" template button and its own parser
+function in `src/lib/importacao.ts`/`src/lib/importacaoSites.ts` (all with D1 access via
+`cloudflare:workers` like the rest of the app, all reverse-mapping labels back to enum values via the
+same `CANAIS`/`STATUS_PEDIDO`/etc. arrays, all matching columns **by header name** not position so
+column order in the uploaded file doesn't matter): Registro de Sites
+(`processarImportacaoSitesXlsx`), Pedidos (`processarImportacaoPedidosXlsx`), and Ações Comerciais
+(`processarImportacaoAcoesXlsx`). Template generators live next to their entity under
+`/api/admin/{pedidos,acoes}/modelo.ts` and `/api/prospeccao/sites/modelo.ts`. There is no bulk
+"Clientes" upload — clients cited by name in a Pedidos or Ações Comerciais row that don't exist yet are
+auto-created (name only, no `observacao`) by the same import call, one `INSERT ... ON CONFLICT DO
+NOTHING` batch per entity import.
+
+`scripts/importar-planilha.ts` and `scripts/importar-registro-sites.ts` are separate CLI importers
+(CSV-only, shell out to `wrangler d1 execute --file=<generated .sql>` since a plain Bun script outside
+the Workers runtime has no `cloudflare:workers` binding access) — they exist for scripted/CI use only;
+prefer pointing people at `/admin/importar`. They were not updated when `/admin/importar` moved to
+per-entity `.xlsx` uploads, so their CSV format/flags may drift from the in-app templates over time.
+Money is `R$` strings/numbers at the spreadsheet boundary but always integer centavos inside the DB and
+app code — convert at the edges (`parseValorReais`, `centavosParaReais`), never carry floats through
+business logic.
 
 ### Prospecção de Sites: a second, independent flow with its own week convention
 
