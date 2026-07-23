@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import type { Usuario } from '../lib/types';
+import { temAcessoArea, type Usuario } from '../lib/types';
 
 interface Props {
   title: string;
@@ -11,6 +11,7 @@ const { title, usuario } = Astro.props;
 
 const gruposNav = [
   {
+    area: 'comercial' as const,
     label: 'Comercial',
     links: [
       { href: '/', label: 'Dashboard' },
@@ -20,6 +21,7 @@ const gruposNav = [
     ]
   },
   {
+    area: 'prospeccao' as const,
     label: 'Prospecção de Sites',
     links: [
       { href: '/prospeccao', label: 'Overview' },
@@ -28,7 +30,7 @@ const gruposNav = [
       { href: '/prospeccao/tabela-precos', label: 'Tabela de Preços' }
     ]
   }
-];
+].filter((grupo) => temAcessoArea(usuario, grupo.area));
 
 const linksAdmin = [
   { href: '/admin/importar', label: 'Importar' },

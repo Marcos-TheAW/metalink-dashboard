@@ -118,12 +118,32 @@ export function nomeMes(mesISO: string): string {
   return nome ? `${nome}/${ano}` : mesISO;
 }
 
+export type AreaAcesso = 'comercial' | 'prospeccao';
+
+export const AREAS_ACESSO: { value: AreaAcesso; label: string }[] = [
+  { value: 'comercial', label: 'Comercial' },
+  { value: 'prospeccao', label: 'Prospecção de Sites' }
+];
+
 export interface Usuario {
   id: number;
   email: string;
   nome: string;
   papel: Papel;
   ativo: number;
+  areas_permitidas: string;
+}
+
+export function areasDoUsuario(usuario: Pick<Usuario, 'areas_permitidas'>): AreaAcesso[] {
+  return usuario.areas_permitidas
+    .split(',')
+    .map((a) => a.trim())
+    .filter((a): a is AreaAcesso => a === 'comercial' || a === 'prospeccao');
+}
+
+export function temAcessoArea(usuario: Pick<Usuario, 'papel' | 'areas_permitidas'>, area: AreaAcesso): boolean {
+  if (usuario.papel === 'admin') return true;
+  return areasDoUsuario(usuario).includes(area);
 }
 
 export interface UsuarioCredenciais extends Usuario {

@@ -16,14 +16,16 @@ if (usuario.papel !== 'admin') {
 
   <div class="flex flex-col gap-8">
     <section class="card max-w-2xl">
-      <h2>Comercial (Clientes, Pedidos, Ações Comerciais)</h2>
+      <h2>Comercial (Dashboard, Clientes, Pedidos, Ações Comerciais)</h2>
       <p class="mt-2 text-sm text-slate-600">
-        Gera um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com 3 abas
-        (Clientes, Pedidos, Ações Comerciais), usando os mesmos nomes e ordem de colunas da
-        planilha original. Esse arquivo é o plano B: se o dashboard falhar, ele pode ser colado
-        de volta no Google Sheets para continuar o fluxo sem perda de dado. Os filtros abaixo
-        afetam as abas <strong>Pedidos</strong> (data e status) e <strong>Ações Comerciais</strong>
-        (data); a aba <strong>Clientes</strong> sempre sai completa, por ser uma lista de
+        Gera um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com 4 abas.
+        <strong>Pedidos</strong> e <strong>Ações Comerciais</strong> usam os mesmos nomes e ordem
+        de colunas da planilha original — esse arquivo é o plano B: se o dashboard falhar, pode
+        ser colado de volta no Google Sheets para continuar o fluxo sem perda de dado. Os filtros
+        abaixo afetam essas duas abas (<strong>Pedidos</strong>: data e status;
+        <strong>Ações Comerciais</strong>: data). As abas <strong>Dashboard</strong> (os mesmos
+        números da página inicial) e <strong>Clientes</strong> sempre saem completas — a primeira
+        porque vem de métricas agregadas de todo o histórico, a segunda por ser uma lista de
         cadastro/status atual, não um registro datado.
       </p>
 

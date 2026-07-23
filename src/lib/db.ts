@@ -90,19 +90,20 @@ export async function criarUsuario(
   nome: string,
   papel: Papel,
   senhaHash: string,
-  senhaSalt: string
+  senhaSalt: string,
+  areasPermitidas: string
 ): Promise<number> {
   const result = await db()
-    .prepare('INSERT INTO usuarios (email, nome, papel, senha_hash, senha_salt) VALUES (?, ?, ?, ?, ?)')
-    .bind(email.trim().toLowerCase(), nome, papel, senhaHash, senhaSalt)
+    .prepare('INSERT INTO usuarios (email, nome, papel, senha_hash, senha_salt, areas_permitidas) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(email.trim().toLowerCase(), nome, papel, senhaHash, senhaSalt, areasPermitidas)
     .run();
   return result.meta.last_row_id as number;
 }
 
-export async function atualizarUsuario(id: number, papel: Papel, ativo: boolean): Promise<void> {
+export async function atualizarUsuario(id: number, papel: Papel, ativo: boolean, areasPermitidas: string): Promise<void> {
   await db()
-    .prepare('UPDATE usuarios SET papel = ?, ativo = ? WHERE id = ?')
-    .bind(papel, ativo ? 1 : 0, id)
+    .prepare('UPDATE usuarios SET papel = ?, ativo = ?, areas_permitidas = ? WHERE id = ?')
+    .bind(papel, ativo ? 1 : 0, areasPermitidas, id)
     .run();
 }
 

@@ -33,9 +33,14 @@ bun run import:planilha        # scripts/importar-planilha.ts — see header of 
 bun run import:registro-sites  # scripts/importar-registro-sites.ts — Registro de Sites CSV, see its header
 ```
 
-Migration files run in filename order; `0002_views.sql` must be applied after `0001_init.sql` (apply it
-the same way, `wrangler d1 execute metalink-dashboard-db --local --file=./migrations/0002_views.sql`,
-swapping `--local`/`--remote` as needed — there's no combined npm script for it yet).
+Migration files run in filename order. `bun run db:migrate:local` / `db:migrate:remote`
+(`scripts/aplicar-migrations.ts`) re-run **every** file in `migrations/*.sql` against that D1 instance
+every time, in filename order — fine for bootstrapping a brand-new/empty D1, but re-running it against a
+DB that already has some migrations applied will fail loudly on the first already-applied
+`CREATE TABLE`/`ALTER TABLE` statement (no "already applied" tracking). To add a single new migration to
+an existing DB (local or prod), apply just that one file directly instead:
+`wrangler d1 execute metalink-dashboard-db --local --file=./migrations/000N_xxx.sql`, swapping
+`--local`/`--remote` as needed — same as every other migration from `0002` onward has been applied.
 
 `astro dev` in this Astro version detaches into a background daemon and the foreground command returns
 immediately once it's up; control it with `bun run astro -- dev stop` / `dev status` / `dev logs` rather
@@ -73,6 +78,23 @@ it to `Astro.locals.usuario` (typed in `src/env.d.ts`, along with `App.SessionDa
 redirect to `/login`. `papel` is `'admin' | 'colaborador'`; `/admin/*` and `/api/admin/*` are blocked
 for non-admins in the middleware, and `/admin/exportar` + `/api/admin/exportar.ts` each re-check
 `locals.usuario.papel === 'admin'` server-side as defense in depth.
+
+Beyond `papel`, colaboradores are further gated **per area** (`usuarios.areas_permitidas`, migration
+`0010_usuarios_areas.sql` — comma-separated TEXT, e.g. `"prospeccao"` or `"comercial,prospeccao"`;
+default for existing/new rows is both, so nothing lost access when this shipped). `src/lib/types.ts`
+exports `AreaAcesso` (`'comercial' | 'prospeccao'`), `AREAS_ACESSO` (the `{value,label}` list for
+checkboxes), and `temAcessoArea(usuario, area)` — **admins always return `true`** regardless of the
+column, so `areas_permitidas` is only ever meaningful for `papel === 'colaborador'`. `src/middleware.ts#areaDaRota()`
+maps a pathname to an area by prefix (`/pedidos`, `/comercial`, `/clientes`, `/` → `comercial`;
+`/prospeccao` → `prospeccao`; `/admin` and `/api/admin` are `null` — that's the separate papel-based gate
+above, not an area) and the middleware 403s any mismatched request, **except** `/` itself: a colaborador
+without Comercial access hitting `/` gets redirected (not 403'd) to their first accessible area via
+`primeiraRotaAcessivel()`, since `/` is the default post-login landing page and a bare 403 there would be
+a dead end. `Layout.astro` filters `gruposNav` by `temAcessoArea()` too, so the nav never shows a link to
+an area the logged-in user can't open. `/admin/usuarios` has one checkbox per `AREAS_ACESSO` entry on
+both the "create user" form and each row's inline edit form — `criarUsuario`/`atualizarUsuario` in
+`src/lib/db.ts` take the joined CSV string directly, no validation beyond what's already enforced by the
+checkbox `value`s.
 
 Sessions are backed by the Cloudflare KV namespace the `@astrojs/cloudflare` adapter auto-provisions
 (you'll see "Enabling sessions with Cloudflare KV" in build/dev output) — there was no extra binding to
@@ -151,18 +173,25 @@ doesn't) — write out the full utility list on each component class instead of 
 
 ### Export/import mirror the original spreadsheet's column layout, not the DB schema
 
-`/api/admin/exportar.ts` (admin-only) generates a 3-sheet `.xlsx` (Clientes, Pedidos, Ações Comerciais)
-using the `xlsx` (SheetJS) package with `XLSX.utils.aoa_to_sheet` — headers and column order are the
-**spreadsheet's** historical names (e.g. "Canal de Origem", "Status do Pedido"), not the DB's snake_case
-enum keys; values pass through `labelFor()` to convert back to human labels. The "Semana (segunda)"
+`/api/admin/exportar.ts` (admin-only) generates a 4-sheet `.xlsx` (Dashboard, Clientes, Pedidos, Ações
+Comerciais) using the `xlsx` (SheetJS) package with `XLSX.utils.aoa_to_sheet`. Pedidos/Ações
+Comerciais's headers and column order are the **spreadsheet's** historical names (e.g. "Canal de
+Origem", "Status do Pedido"), not the DB's snake_case enum keys; values pass through `labelFor()` to
+convert back to human labels. The Dashboard sheet has no spreadsheet precedent — it's the same numbers
+as the `/` page (`getKpisGerais`/`getExecucaoVendas`/`getKpisPorCanal`/`getRetencaoClientes`/
+`getKpisPorMes`/`getExecucaoComercial`), laid out as stacked label/table blocks in one sheet the same
+way `/api/admin/prospeccao/exportar.ts`'s "Visão Geral" sheet is (see below) — duplicated math from
+`src/pages/index.astro` rather than a shared helper, since it's ~10 lines of small derived-metric
+arithmetic, not worth extracting for two call sites. `?status=`/`?data_inicio=`/`?data_fim=` filter
+Pedidos and Ações Comerciais only (via `FiltrosPedidos`/`FiltrosAcoes` in `db.ts` — `status` is Pedidos-only,
+Ações Comerciais has no "status", only `resultado`, not exposed as a filter); Dashboard and Clientes
+always export unfiltered — Dashboard because its numbers come from SQL views/aggregates with no filter
+parameters, Clientes because it's a cadastro/status snapshot, not a dated record. The "Semana (segunda)"
 column is reconstructed from `data_pedido`/`data_acao` at export time (`segundaFeiraDaSemana()`) — it is
 never stored. `/admin/exportar` submits a plain `<form method="get" action="/api/admin/exportar">` (no
 JS) with `status`/`data_inicio`/`data_fim` fields — the browser's own GET-navigates-to-download behavior
 on a response with `Content-Disposition: attachment` is what triggers the file download, same trick used
 by every other filtered list page in the app (`Astro.url.searchParams`, see `/pedidos`, `/comercial`).
-Filters reuse `listPedidos`/`listAcoes`'s existing `FiltrosPedidos`/`FiltrosAcoes` (`status` only applies
-to Pedidos — Ações Comerciais has no "status", only `resultado`, not exposed as a filter here); the
-Clientes sheet always exports unfiltered since it's a cadastro/status snapshot, not a dated record.
 
 `/api/admin/prospeccao/exportar.ts` (admin-only) is the equivalent full export for the Prospecção de
 Sites flow, one sheet per nav area rather than mirroring a spreadsheet: **Visão Geral** (the same 4

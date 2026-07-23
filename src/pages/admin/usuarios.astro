@@ -3,7 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import ErrorBanner from '../../components/ErrorBanner.astro';
 import { atualizarUsuario, criarUsuario, definirSenha, listUsuarios } from '../../lib/db';
 import { gerarHashSenha, gerarSenhaTemporaria } from '../../lib/senha';
-import type { Papel } from '../../lib/types';
+import { AREAS_ACESSO, areasDoUsuario, type Papel } from '../../lib/types';
 
 const usuarioLogado = Astro.locals.usuario;
 
@@ -25,13 +25,14 @@ if (Astro.request.method === 'POST') {
       const email = String(form.get('email') ?? '').trim().toLowerCase();
       const nome = String(form.get('nome') ?? '').trim();
       const papel = String(form.get('papel') ?? '');
+      const areas = form.getAll('areas').map(String).join(',');
 
       if (!email || !nome || (papel !== 'admin' && papel !== 'colaborador')) {
         erro = 'Preencha e-mail, nome e papel corretamente.';
       } else {
         const senha = gerarSenhaTemporaria();
         const { hash, salt } = await gerarHashSenha(senha);
-        await criarUsuario(email, nome, papel as Papel, hash, salt);
+        await criarUsuario(email, nome, papel as Papel, hash, salt, areas);
         senhaGerada = senha;
         mensagemSucesso = `Usuário ${email} cadastrado.`;
       }
@@ -39,8 +40,9 @@ if (Astro.request.method === 'POST') {
       const id = Number(form.get('id'));
       const papel = String(form.get('papel') ?? '');
       const ativo = form.get('ativo') === '1';
+      const areas = form.getAll('areas').map(String).join(',');
       if (Number.isFinite(id) && (papel === 'admin' || papel === 'colaborador')) {
-        await atualizarUsuario(id, papel as Papel, ativo);
+        await atualizarUsuario(id, papel as Papel, ativo, areas);
         mensagemSucesso = 'Usuário atualizado.';
       }
     } else if (acao === 'redefinir-senha') {
@@ -101,6 +103,19 @@ const usuarios = await listUsuarios();
         </select>
       </div>
       <div class="sm:col-span-3">
+        <label>Áreas com acesso (só se aplica a Colaborador — Admin sempre tem acesso total)</label>
+        <div class="mt-1 flex flex-wrap gap-4">
+          {
+            AREAS_ACESSO.map((a) => (
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" name="areas" value={a.value} checked class="mt-0 w-auto" />
+                {a.label}
+              </label>
+            ))
+          }
+        </div>
+      </div>
+      <div class="sm:col-span-3">
         <button type="submit" class="btn-primary">Cadastrar usuário</button>
       </div>
     </form>
@@ -113,34 +128,62 @@ const usuarios = await listUsuarios();
           <th>Nome</th>
           <th>E-mail</th>
           <th>Papel</th>
+          <th>Áreas</th>
           <th>Ativo</th>
           <th>Ações</th>
         </tr>
       </thead>
       <tbody>
         {
-          usuarios.map((u) => (
+          usuarios.map((u) => {
+            const areasAtuais = areasDoUsuario(u);
+            return (
             <tr>
               <td>{u.nome}</td>
               <td>{u.email}</td>
               <td>{u.papel === 'admin' ? 'Admin' : 'Colaborador'}</td>
+              <td>
+                {u.papel === 'admin'
+                  ? 'Todas'
+                  : AREAS_ACESSO.filter((a) => areasAtuais.includes(a.value))
+                      .map((a) => a.label)
+                      .join(', ') || '—'}
+              </td>
               <td>{u.ativo ? 'Sim' : 'Não'}</td>
               <td>
-                <form method="post" class="flex flex-wrap items-center gap-2">
+                <form method="post" class="flex flex-col items-start gap-2">
                   <input type="hidden" name="acao" value="atualizar" />
                   <input type="hidden" name="id" value={u.id} />
-                  <select name="papel" class="mt-0 w-auto py-1">
-                    <option value="colaborador" selected={u.papel === 'colaborador'}>
-                      Colaborador
-                    </option>
-                    <option value="admin" selected={u.papel === 'admin'}>
-                      Admin
-                    </option>
-                  </select>
-                  <label class="flex items-center gap-1 text-xs text-slate-600">
-                    <input type="checkbox" name="ativo" value="1" checked={!!u.ativo} class="mt-0 w-auto" />
-                    Ativo
-                  </label>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <select name="papel" class="mt-0 w-auto py-1">
+                      <option value="colaborador" selected={u.papel === 'colaborador'}>
+                        Colaborador
+                      </option>
+                      <option value="admin" selected={u.papel === 'admin'}>
+                        Admin
+                      </option>
+                    </select>
+                    <label class="flex items-center gap-1 text-xs text-slate-600">
+                      <input type="checkbox" name="ativo" value="1" checked={!!u.ativo} class="mt-0 w-auto" />
+                      Ativo
+                    </label>
+                  </div>
+                  <div class="flex flex-wrap gap-3">
+                    {
+                      AREAS_ACESSO.map((a) => (
+                        <label class="flex items-center gap-1 text-xs text-slate-600">
+                          <input
+                            type="checkbox"
+                            name="areas"
+                            value={a.value}
+                            checked={areasAtuais.includes(a.value)}
+                            class="mt-0 w-auto"
+                          />
+                          {a.label}
+                        </label>
+                      ))
+                    }
+                  </div>
                   <button type="submit" class="text-sm text-brand-500 hover:underline">
                     Salvar
                   </button>
@@ -158,7 +201,8 @@ const usuarios = await listUsuarios();
                 </form>
               </td>
             </tr>
-          ))
+            );
+          })
         }
       </tbody>
     </table>

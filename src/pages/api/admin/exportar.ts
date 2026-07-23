@@ -1,6 +1,16 @@
 import type { APIRoute } from 'astro';
 import * as XLSX from 'xlsx';
-import { listAcoes, listClientesStatus, listPedidos } from '../../../lib/db';
+import {
+  getExecucaoComercial,
+  getExecucaoVendas,
+  getKpisGerais,
+  getKpisPorCanal,
+  getKpisPorMes,
+  getRetencaoClientes,
+  listAcoes,
+  listClientesStatus,
+  listPedidos
+} from '../../../lib/db';
 import {
   CANAIS,
   CANAIS_COMERCIAIS,
@@ -9,6 +19,7 @@ import {
   STATUS_RELACIONAMENTO_LABEL,
   TIPOS_ACAO,
   labelFor,
+  nomeMes,
   segundaFeiraDaSemana,
   type StatusRelacionamento
 } from '../../../lib/types';
@@ -24,13 +35,21 @@ export const GET: APIRoute = async ({ locals, url }) => {
   const dataInicio = url.searchParams.get('data_inicio') ?? '';
   const dataFim = url.searchParams.get('data_fim') ?? '';
 
-  // Clientes é uma lista de cadastro/status atual, não um registro datado — não faz sentido
-  // filtrar por período, então sai sempre completa independente dos filtros de Pedidos/Ações.
-  const [pedidos, acoes, clientes] = await Promise.all([
-    listPedidos({ status: status || undefined, dataInicio: dataInicio || undefined, dataFim: dataFim || undefined }),
-    listAcoes({ dataInicio: dataInicio || undefined, dataFim: dataFim || undefined }),
-    listClientesStatus()
-  ]);
+  // Clientes e Dashboard não têm filtro: Clientes é uma lista de cadastro/status atual (não um
+  // registro datado); Dashboard vem de views SQL que agregam sempre o histórico completo (mesma
+  // limitação da Visão Geral da Prospecção — ver /api/admin/prospeccao/exportar.ts).
+  const [pedidos, acoes, clientes, kpis, execucaoVendas, porCanal, retencao, porMes, execucaoComercial] =
+    await Promise.all([
+      listPedidos({ status: status || undefined, dataInicio: dataInicio || undefined, dataFim: dataFim || undefined }),
+      listAcoes({ dataInicio: dataInicio || undefined, dataFim: dataFim || undefined }),
+      listClientesStatus(),
+      getKpisGerais(),
+      getExecucaoVendas(),
+      getKpisPorCanal(),
+      getRetencaoClientes(),
+      getKpisPorMes(),
+      getExecucaoComercial()
+    ]);
 
   const clientesHeader = [
     'Cliente',
@@ -97,7 +116,89 @@ export const GET: APIRoute = async ({ locals, url }) => {
     a.observacoes ?? ''
   ]);
 
+  // ---------- Dashboard (mesmos números da página "/") ----------
+
+  const semanas = execucaoVendas.semanas_decorridas;
+  const ticketMedioGeralCentavos =
+    execucaoVendas.total_pedidos > 0 ? execucaoVendas.total_receita_centavos / execucaoVendas.total_pedidos : 0;
+  const ticketMedioUltimaSemanaCentavos =
+    execucaoVendas.ultima_semana_pedidos > 0
+      ? execucaoVendas.ultima_semana_receita_centavos / execucaoVendas.ultima_semana_pedidos
+      : null;
+
+  const retencaoMap = new Map(retencao.map((r) => [r.status_relacionamento, r.total]));
+  const totalClientesComPedido =
+    (retencaoMap.get('ativo') ?? 0) + (retencaoMap.get('em_risco') ?? 0) + (retencaoMap.get('perdido') ?? 0);
+  const ordemStatus: StatusRelacionamento[] = ['ativo', 'em_risco', 'perdido', 'nunca_comprou'];
+
+  const dashboardLinhas: unknown[][] = [
+    ['KPIs Gerais'],
+    ['Receita Total (R$)', kpis.receita_total_centavos / 100],
+    ['Total de Pedidos', kpis.total_pedidos],
+    ['Ticket Médio (R$)', kpis.ticket_medio_centavos / 100],
+    ['Taxa de Conversão Comercial (%)', Math.round(kpis.taxa_conversao * 1000) / 10],
+    ['Ações Convertidas', kpis.acoes_convertidas],
+    ['Total de Ações', kpis.total_acoes],
+    ['Receita em Risco (R$)', kpis.receita_em_risco_centavos / 100],
+    [],
+    ['Execução de Vendas'],
+    ['Métrica', 'Total Acumulado', 'Média por Semana', 'Última Semana'],
+    [
+      'Pedidos Recebidos',
+      execucaoVendas.total_pedidos,
+      semanas > 0 ? Math.round((execucaoVendas.total_pedidos / semanas) * 10) / 10 : '',
+      execucaoVendas.ultima_semana_pedidos
+    ],
+    [
+      'Links Vendidos',
+      execucaoVendas.total_links,
+      semanas > 0 ? Math.round((execucaoVendas.total_links / semanas) * 10) / 10 : '',
+      execucaoVendas.ultima_semana_links
+    ],
+    [
+      'Receita Total (R$)',
+      execucaoVendas.total_receita_centavos / 100,
+      semanas > 0 ? Math.round(execucaoVendas.total_receita_centavos / semanas) / 100 : '',
+      execucaoVendas.ultima_semana_receita_centavos / 100
+    ],
+    [
+      'Ticket Médio por Pedido (R$)',
+      ticketMedioGeralCentavos / 100,
+      '',
+      ticketMedioUltimaSemanaCentavos !== null ? ticketMedioUltimaSemanaCentavos / 100 : ''
+    ],
+    [],
+    ['Receita por Canal'],
+    ['Canal', 'Pedidos', 'Receita (R$)'],
+    ...porCanal.map((row) => [labelFor(CANAIS, row.canal), row.total_pedidos, row.receita_centavos / 100]),
+    [],
+    ['Retenção de Clientes'],
+    ['Status', 'Clientes', '%'],
+    ...ordemStatus.map((s) => [
+      STATUS_RELACIONAMENTO_LABEL[s],
+      retencaoMap.get(s) ?? 0,
+      s === 'nunca_comprou' || totalClientesComPedido === 0
+        ? ''
+        : Math.round(((retencaoMap.get(s) ?? 0) / totalClientesComPedido) * 1000) / 10
+    ]),
+    [],
+    ['Receita Mensal'],
+    ['Mês', 'Pedidos Recebidos', 'Links Vendidos', 'Receita Total (R$)', 'Ticket Médio (R$)'],
+    ...porMes.map((row) => [
+      nomeMes(row.mes),
+      row.total_pedidos,
+      row.total_links,
+      row.receita_centavos / 100,
+      row.ticket_medio_centavos / 100
+    ]),
+    [],
+    ['Execução Comercial (Tipo × Resultado)'],
+    ['Tipo de Ação', 'Resultado', 'Total'],
+    ...execucaoComercial.map((row) => [labelFor(TIPOS_ACAO, row.tipo), labelFor(RESULTADOS_ACAO, row.resultado), row.total])
+  ];
+
   const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(dashboardLinhas), 'Dashboard');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([clientesHeader, ...clientesRows]), 'Clientes');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([pedidosHeader, ...pedidosRows]), 'Pedidos');
   XLSX.utils.book_append_sheet(
