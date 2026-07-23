@@ -503,6 +503,8 @@ export interface FiltrosAcoes {
   resultado?: string;
   canal?: string;
   cliente_id?: number;
+  dataInicio?: string;
+  dataFim?: string;
 }
 
 export interface AcaoComComCliente extends AcaoComercial {
@@ -527,6 +529,14 @@ export async function listAcoes(filtros: FiltrosAcoes = {}): Promise<AcaoComComC
   if (filtros.cliente_id) {
     clauses.push('a.cliente_id = ?');
     params.push(filtros.cliente_id);
+  }
+  if (filtros.dataInicio) {
+    clauses.push('a.data_acao >= ?');
+    params.push(filtros.dataInicio);
+  }
+  if (filtros.dataFim) {
+    clauses.push('a.data_acao <= ?');
+    params.push(filtros.dataFim);
   }
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const { results } = await db()

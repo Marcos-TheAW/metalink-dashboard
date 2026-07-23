@@ -13,16 +13,22 @@ import {
   type StatusRelacionamento
 } from '../../../lib/types';
 
-export const GET: APIRoute = async ({ locals }) => {
+export const GET: APIRoute = async ({ locals, url }) => {
   // Checagem redundante: o middleware já bloqueia /api/admin para não-admins,
   // mas a rota também valida por conta própria, caso seja chamada diretamente.
   if (locals.usuario.papel !== 'admin') {
     return new Response('Acesso restrito a administradores.', { status: 403 });
   }
 
+  const status = url.searchParams.get('status') ?? '';
+  const dataInicio = url.searchParams.get('data_inicio') ?? '';
+  const dataFim = url.searchParams.get('data_fim') ?? '';
+
+  // Clientes é uma lista de cadastro/status atual, não um registro datado — não faz sentido
+  // filtrar por período, então sai sempre completa independente dos filtros de Pedidos/Ações.
   const [pedidos, acoes, clientes] = await Promise.all([
-    listPedidos(),
-    listAcoes(),
+    listPedidos({ status: status || undefined, dataInicio: dataInicio || undefined, dataFim: dataFim || undefined }),
+    listAcoes({ dataInicio: dataInicio || undefined, dataFim: dataFim || undefined }),
     listClientesStatus()
   ]);
 

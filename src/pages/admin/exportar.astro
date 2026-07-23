@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import { STATUS_PEDIDO } from '../../lib/types';
 
 const usuario = Astro.locals.usuario;
 
@@ -13,13 +14,53 @@ if (usuario.papel !== 'admin') {
 <Layout title="Exportar dados" usuario={usuario}>
   <h1 class="mb-6">Exportar dados</h1>
 
-  <div class="card max-w-xl">
-    <p class="text-sm text-slate-600">
-      Gera um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com 3 abas
-      (Clientes, Pedidos, Ações Comerciais), usando os mesmos nomes e ordem de colunas da
-      planilha original. Esse arquivo é o plano B: se o dashboard falhar, ele pode ser colado
-      de volta no Google Sheets para continuar o fluxo sem perda de dado.
-    </p>
-    <a href="/api/admin/exportar" class="btn-primary mt-4 inline-flex">Baixar exportação .xlsx</a>
+  <div class="flex flex-col gap-8">
+    <section class="card max-w-2xl">
+      <h2>Comercial (Clientes, Pedidos, Ações Comerciais)</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Gera um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com 3 abas
+        (Clientes, Pedidos, Ações Comerciais), usando os mesmos nomes e ordem de colunas da
+        planilha original. Esse arquivo é o plano B: se o dashboard falhar, ele pode ser colado
+        de volta no Google Sheets para continuar o fluxo sem perda de dado. Os filtros abaixo
+        afetam as abas <strong>Pedidos</strong> (data e status) e <strong>Ações Comerciais</strong>
+        (data); a aba <strong>Clientes</strong> sempre sai completa, por ser uma lista de
+        cadastro/status atual, não um registro datado.
+      </p>
+
+      <form method="get" action="/api/admin/exportar" class="mt-4 flex flex-col gap-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label>Período (Data do Pedido / Data da Ação)</label>
+            <div class="mt-1 flex items-center gap-2">
+              <input type="date" name="data_inicio" class="mt-0 w-full min-w-0" />
+              <span class="shrink-0 text-slate-500">–</span>
+              <input type="date" name="data_fim" class="mt-0 w-full min-w-0" />
+            </div>
+          </div>
+          <div>
+            <label for="status">Status do Pedido</label>
+            <select id="status" name="status">
+              <option value="">Todos</option>
+              {STATUS_PEDIDO.map((s) => <option value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <button type="submit" class="btn-primary">Baixar exportação .xlsx</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card max-w-2xl">
+      <h2>Prospecção de Sites</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Gera um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com 4 abas,
+        uma para cada área da Prospecção: <strong>Visão Geral</strong> (os 4 blocos de métricas da
+        página de overview), <strong>Painel Semanal</strong> (uma linha por semana),
+        <strong>Registro de Sites</strong> (um site por linha, mesmas colunas do modelo de
+        importação) e <strong>Tabela de Preços</strong> (faixas de DR/tráfego e sinais de alerta).
+      </p>
+      <a href="/api/admin/prospeccao/exportar" class="btn-primary mt-4 inline-flex">Baixar exportação .xlsx</a>
+    </section>
   </div>
 </Layout>

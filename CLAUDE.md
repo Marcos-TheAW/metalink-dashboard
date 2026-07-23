@@ -156,7 +156,26 @@ using the `xlsx` (SheetJS) package with `XLSX.utils.aoa_to_sheet` — headers an
 **spreadsheet's** historical names (e.g. "Canal de Origem", "Status do Pedido"), not the DB's snake_case
 enum keys; values pass through `labelFor()` to convert back to human labels. The "Semana (segunda)"
 column is reconstructed from `data_pedido`/`data_acao` at export time (`segundaFeiraDaSemana()`) — it is
-never stored.
+never stored. `/admin/exportar` submits a plain `<form method="get" action="/api/admin/exportar">` (no
+JS) with `status`/`data_inicio`/`data_fim` fields — the browser's own GET-navigates-to-download behavior
+on a response with `Content-Disposition: attachment` is what triggers the file download, same trick used
+by every other filtered list page in the app (`Astro.url.searchParams`, see `/pedidos`, `/comercial`).
+Filters reuse `listPedidos`/`listAcoes`'s existing `FiltrosPedidos`/`FiltrosAcoes` (`status` only applies
+to Pedidos — Ações Comerciais has no "status", only `resultado`, not exposed as a filter here); the
+Clientes sheet always exports unfiltered since it's a cadastro/status snapshot, not a dated record.
+
+`/api/admin/prospeccao/exportar.ts` (admin-only) is the equivalent full export for the Prospecção de
+Sites flow, one sheet per nav area rather than mirroring a spreadsheet: **Visão Geral** (the same 4
+blocks as `/prospeccao`'s overview queries, laid out as label/value pairs via the local `linhasBloco()`
+helper, not a row-per-record table), **Painel Semanal** (`listPainelSemanal()`, one row per week),
+**Registro de Sites** (`listSitesProspectados()`, headers reused from `CABECALHO_MODELO` in
+`src/lib/importacaoSites.ts` so the export and the import template stay column-for-column identical),
+and **Tabela de Preços** (both `tabela_precos_faixas` and `tabela_precos_red_flags`, stacked as two
+mini-tables in one sheet via a single `aoa_to_sheet` call with a blank-row separator). No filters — the
+underlying SQL views (`v_prospeccao_semanal`, `v_prospeccao_overview_*`) aggregate over all data with no
+parameters, so adding date filtering here would need new view variants, not just a query-string read.
+Percentages export as a plain number already ×100 (e.g. `42.3` for 42.3%, header says "(%)") via the
+local `percentual()` helper, not a formatted "42.3%" string, so the values stay usable in Excel formulas.
 
 `/admin/importar` (in-app, admin-only) is the lower-friction import path and has one upload field per
 entity, each single-sheet `.xlsx` with its own "Baixar modelo" template button and its own parser
