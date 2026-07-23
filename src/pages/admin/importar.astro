@@ -1,7 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { processarImportacaoXlsx, type ResultadoImportacao } from '../../lib/importacao';
-import { processarImportacaoSitesCsv, type ResultadoImportacaoSites } from '../../lib/importacaoSites';
+import { processarImportacaoSitesXlsx, type ResultadoImportacaoSites } from '../../lib/importacaoSites';
 
 const usuario = Astro.locals.usuario;
 
@@ -23,10 +23,10 @@ if (Astro.request.method === 'POST') {
     try {
       const arquivo = form.get('arquivo_sites');
       if (!(arquivo instanceof File) || arquivo.size === 0) {
-        erroSites = 'Selecione um arquivo .csv antes de enviar.';
+        erroSites = 'Selecione um arquivo .xlsx antes de enviar.';
       } else {
-        const conteudo = await arquivo.text();
-        resultadoSites = await processarImportacaoSitesCsv(conteudo, usuario.id);
+        const buffer = await arquivo.arrayBuffer();
+        resultadoSites = await processarImportacaoSitesXlsx(buffer, usuario.id);
       }
     } catch (e) {
       erroSites = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
@@ -54,17 +54,17 @@ if (Astro.request.method === 'POST') {
     <section class="card max-w-2xl">
       <h2>Registro de Sites (Prospecção)</h2>
       <p class="mt-2 text-sm text-slate-600">
-        Envie um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.csv</code> com os novos contatos
-        de sites parceiros. As colunas precisam seguir exatamente a ordem do modelo — baixe e preencha a
-        partir dele, sem reordenar ou remover colunas.
+        Envie um arquivo <code class="rounded bg-slate-100 px-1 py-0.5">.xlsx</code> com os novos contatos
+        de sites parceiros. Baixe o modelo abaixo, preencha os dados e faça o upload — os nomes das
+        colunas precisam ficar como estão no modelo (a ordem não importa, mas não renomeie os cabeçalhos).
       </p>
-      <a href="/api/prospeccao/sites/modelo" class="btn-secondary mt-3 inline-flex">Baixar modelo .csv</a>
+      <a href="/api/prospeccao/sites/modelo" class="btn-secondary mt-3 inline-flex">Baixar modelo .xlsx</a>
 
       <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <input type="hidden" name="tipo" value="sites" />
         <div class="flex-1">
-          <label for="arquivo_sites">Arquivo .csv</label>
-          <input type="file" id="arquivo_sites" name="arquivo_sites" accept=".csv" required />
+          <label for="arquivo_sites">Arquivo .xlsx</label>
+          <input type="file" id="arquivo_sites" name="arquivo_sites" accept=".xlsx" required />
         </div>
         <button type="submit" class="btn-primary">Importar sites</button>
       </form>

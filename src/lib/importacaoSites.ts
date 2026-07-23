@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { db } from './db';
 import {
   CANAIS_PROSPECCAO,
@@ -8,35 +9,7 @@ import {
   segundaFeiraDaSemana
 } from './types';
 
-// Parsing é posicional (não por nome de cabeçalho): exports de CSV do Google Sheets
-// frequentemente corrompem acentos/travessões dependendo do encoding de saída, mas a
-// ORDEM das colunas é estável. Mesmo padrão de scripts/importar-registro-sites.ts (CLI) —
-// duplicado aqui de propósito, não importado, porque aquele script roda em Node fora do
-// Workers runtime (usa node:fs) e este módulo roda dentro do Worker.
-
-const IDX = {
-  url: 0,
-  dr: 1,
-  trafego: 2,
-  nicho: 3,
-  canal: 4,
-  tipoContato: 5,
-  status: 6,
-  tentativas: 7,
-  data: 8,
-  linkEmail: 9,
-  valorSolicitadoWhite: 10,
-  valorSolicitadoBlack: 11,
-  valorFechadoWhite: 12,
-  valorFechadoBlack: 13,
-  valorFechadoInsercao: 14,
-  aceitaInsercao: 15,
-  aceitaPacote: 16,
-  administraOutrosSites: 17,
-  outrosSitesUrls: 18,
-  dentroTabelaPrecos: 19,
-  observacoes: 20
-} as const;
+type Linha = Record<string, string>;
 
 export const CABECALHO_MODELO = [
   'URL do Site',
@@ -62,45 +35,27 @@ export const CABECALHO_MODELO = [
   'Observações'
 ];
 
-function parseCsv(conteudo: string): string[][] {
-  const texto = conteudo.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-  const linhas: string[][] = [];
-  let campo = '';
-  let linha: string[] = [];
-  let dentroDeAspas = false;
+function normalizarChaves(linha: Linha): Linha {
+  const normalizada: Linha = {};
+  for (const [chave, valor] of Object.entries(linha)) {
+    normalizada[chave.trim()] = typeof valor === 'string' ? valor : String(valor ?? '');
+  }
+  return normalizada;
+}
 
-  for (let i = 0; i < texto.length; i++) {
-    const char = texto[i];
-    if (dentroDeAspas) {
-      if (char === '"') {
-        if (texto[i + 1] === '"') {
-          campo += '"';
-          i++;
-        } else {
-          dentroDeAspas = false;
-        }
-      } else {
-        campo += char;
-      }
-    } else if (char === '"') {
-      dentroDeAspas = true;
-    } else if (char === ',') {
-      linha.push(campo);
-      campo = '';
-    } else if (char === '\n') {
-      linha.push(campo);
-      linhas.push(linha);
-      linha = [];
-      campo = '';
-    } else {
-      campo += char;
-    }
-  }
-  if (campo.length > 0 || linha.length > 0) {
-    linha.push(campo);
-    linhas.push(linha);
-  }
-  return linhas.filter((l) => l.some((c) => c.trim() !== ''));
+function normalizarNomeAba(nome: string): string {
+  return nome
+    .replace(/[^\p{L}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function encontrarPlanilha(workbook: XLSX.WorkBook): XLSX.WorkSheet {
+  const alvo = normalizarNomeAba('Registro de Sites');
+  const nomeReal = workbook.SheetNames.find((n) => normalizarNomeAba(n) === alvo);
+  const nome = nomeReal ?? workbook.SheetNames[0];
+  return workbook.Sheets[nome];
 }
 
 function labelParaValor(lista: { value: string; label: string }[], texto: string): string | null {
@@ -193,42 +148,41 @@ export interface ResultadoImportacaoSites {
   ignorados: LinhaIgnoradaSite[];
 }
 
-export async function processarImportacaoSitesCsv(
-  conteudo: string,
+export async function processarImportacaoSitesXlsx(
+  buffer: ArrayBuffer,
   usuarioId: number
 ): Promise<ResultadoImportacaoSites> {
-  const linhas = parseCsv(conteudo);
-  const indiceCabecalho = linhas.findIndex((l) => (l[0] ?? '').trim() === 'URL do Site');
-  if (indiceCabecalho === -1) {
-    throw new Error(
-      'Cabeçalho "URL do Site" não encontrado na primeira coluna do CSV. Use o modelo disponibilizado nesta página.'
-    );
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const planilha = encontrarPlanilha(workbook);
+  if (!planilha) {
+    throw new Error('Não encontrei nenhuma aba no arquivo enviado.');
   }
-  const linhasDados = linhas.slice(indiceCabecalho + 1);
+
+  const linhas = XLSX.utils.sheet_to_json<Linha>(planilha, { raw: false, defval: '' }).map(normalizarChaves);
 
   const statements: D1PreparedStatement[] = [];
   const ignorados: LinhaIgnoradaSite[] = [];
 
-  linhasDados.forEach((linha, indice) => {
-    const numeroLinha = indiceCabecalho + indice + 2; // posição real no arquivo (1-based + cabeçalho)
-    const urlSite = (linha[IDX.url] ?? '').trim();
+  linhas.forEach((linha, indice) => {
+    const numeroLinha = indice + 2; // +1 pelo cabeçalho, +1 por índice base 1
+    const urlSite = (linha['URL do Site'] ?? '').trim();
     if (!urlSite) return; // linha em branco no fim do arquivo — não é um erro, só ignora silenciosamente
 
-    const canal = labelParaValor(CANAIS_PROSPECCAO, linha[IDX.canal] ?? '');
-    const tipoContato = labelParaValor(TIPOS_CONTATO_PROSPECCAO, linha[IDX.tipoContato] ?? '');
-    const status = labelParaValor(STATUS_PROSPECCAO, linha[IDX.status] ?? '');
-    const dataContatoTexto = (linha[IDX.data] ?? '').trim();
+    const canal = labelParaValor(CANAIS_PROSPECCAO, linha['Canal Utilizado'] ?? '');
+    const tipoContato = labelParaValor(TIPOS_CONTATO_PROSPECCAO, linha['Tipo de Contato'] ?? '');
+    const status = labelParaValor(STATUS_PROSPECCAO, linha['Status Atual'] ?? '');
+    const dataContatoTexto = (linha['Data do Contato (segunda-feira da semana)'] ?? '').trim();
 
     if (!canal) {
-      ignorados.push({ linha: numeroLinha, motivo: `Canal Utilizado inválido: "${linha[IDX.canal] ?? ''}".` });
+      ignorados.push({ linha: numeroLinha, motivo: `Canal Utilizado inválido: "${linha['Canal Utilizado'] ?? ''}".` });
       return;
     }
     if (!tipoContato) {
-      ignorados.push({ linha: numeroLinha, motivo: `Tipo de Contato inválido: "${linha[IDX.tipoContato] ?? ''}".` });
+      ignorados.push({ linha: numeroLinha, motivo: `Tipo de Contato inválido: "${linha['Tipo de Contato'] ?? ''}".` });
       return;
     }
     if (!status) {
-      ignorados.push({ linha: numeroLinha, motivo: `Status Atual inválido: "${linha[IDX.status] ?? ''}".` });
+      ignorados.push({ linha: numeroLinha, motivo: `Status Atual inválido: "${linha['Status Atual'] ?? ''}".` });
       return;
     }
     if (!dataContatoTexto) {
@@ -258,26 +212,26 @@ export async function processarImportacaoSitesCsv(
         )
         .bind(
           urlSite,
-          inteiroOuNull(linha[IDX.dr]),
-          limparTrafego(linha[IDX.trafego]),
-          textoOuNull(linha[IDX.nicho]),
+          inteiroOuNull(linha['DR']),
+          limparTrafego(linha['Tráfego Estimado']),
+          textoOuNull(linha['Nicho / Segmento']),
           canal,
           tipoContato,
           status,
-          inteiroOuNull(linha[IDX.tentativas]) ?? 1,
+          inteiroOuNull(linha['Nº de Tentativas']) ?? 1,
           dataContato,
-          textoOuNull(linha[IDX.linkEmail]),
-          dinheiroOuNull(linha[IDX.valorSolicitadoWhite]),
-          dinheiroOuNull(linha[IDX.valorSolicitadoBlack]),
-          dinheiroOuNull(linha[IDX.valorFechadoWhite]),
-          dinheiroOuNull(linha[IDX.valorFechadoBlack]),
-          dinheiroOuNull(linha[IDX.valorFechadoInsercao]),
-          enumOuNull(OPCOES_TRI_ESTADO, linha[IDX.aceitaInsercao]),
-          enumOuNull(OPCOES_TRI_ESTADO, linha[IDX.aceitaPacote]),
-          enumOuNull(OPCOES_TRI_ESTADO, linha[IDX.administraOutrosSites]),
-          textoOuNull(linha[IDX.outrosSitesUrls]),
-          enumOuNull(OPCOES_SIM_NAO, linha[IDX.dentroTabelaPrecos]),
-          textoOuNull(linha[IDX.observacoes]),
+          textoOuNull(linha['Link do E-mail']),
+          dinheiroOuNull(linha['Valor Solicitado – White Hat (R$)']),
+          dinheiroOuNull(linha['Valor Solicitado – Black Hat (R$)']),
+          dinheiroOuNull(linha['Valor Fechado – White Hat (R$)']),
+          dinheiroOuNull(linha['Valor Fechado – Black Hat (R$)']),
+          dinheiroOuNull(linha['Valor Fechado – Inserção (R$)']),
+          enumOuNull(OPCOES_TRI_ESTADO, linha['Aceita Inserção?']),
+          enumOuNull(OPCOES_TRI_ESTADO, linha['Aceita Pacote?']),
+          enumOuNull(OPCOES_TRI_ESTADO, linha['Adm. Outros Sites?']),
+          textoOuNull(linha['Outros Sites (URLs)']),
+          enumOuNull(OPCOES_SIM_NAO, linha['Dentro da tabela de preços?']),
+          textoOuNull(linha['Observações']),
           usuarioId
         )
     );
