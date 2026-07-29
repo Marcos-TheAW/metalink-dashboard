@@ -1,0 +1,603 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const usuario = Astro.locals.usuario;
+---
+
+<Layout title="Criação de Invoice para Clientes Gringos" usuario={usuario}>
+  <h1 class="mb-6">Criação de Invoice para Clientes Gringos</h1>
+
+  <section id="form-section" class="card max-w-3xl">
+    <p class="text-sm text-slate-500">
+      Preencha os campos abaixo. O layout final reproduz exatamente o modelo MotherLink — logo, tabela de
+      serviços e dados bancários são fixos e não podem ser alterados aqui.
+    </p>
+
+    <form id="invoice-form" class="mt-6 flex flex-col gap-6" novalidate>
+      <div>
+        <label for="cliente_nome">Nome do cliente</label>
+        <input type="text" id="cliente_nome" name="cliente_nome" required placeholder="Ex: MotherLink" />
+      </div>
+
+      <fieldset class="rounded-md border border-slate-300 p-4">
+        <legend class="px-1 text-sm font-medium text-slate-700">Billed To</legend>
+        <div class="flex flex-col gap-4">
+          <div>
+            <label for="billed_linha1">Nome / razão social do cliente</label>
+            <input type="text" id="billed_linha1" name="billed_linha1" required placeholder="Ex: 7 Figures OÜ" />
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label for="register_code">Register code</label>
+              <input type="text" id="register_code" name="register_code" required />
+            </div>
+            <div>
+              <label for="vat_id">VAT ID</label>
+              <input type="text" id="vat_id" name="vat_id" required />
+            </div>
+          </div>
+          <div>
+            <label for="billed_cidade_pais">Bairro, cidade e país</label>
+            <input
+              type="text"
+              id="billed_cidade_pais"
+              name="billed_cidade_pais"
+              required
+              placeholder="Ex: Estonia, Tallinn, Vesivärava"
+            />
+          </div>
+          <div>
+            <label for="billed_complemento">Complemento do endereço <span class="text-slate-400">(opcional)</span></label>
+            <input
+              type="text"
+              id="billed_complemento"
+              name="billed_complemento"
+              placeholder="Ex: 50, 3rd Floor, Room 3.9,10152"
+            />
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label for="invoice_number">Invoice number</label>
+          <input type="text" id="invoice_number" name="invoice_number" required placeholder="Ex: 0000000004" />
+        </div>
+        <div>
+          <label>Invoice date</label>
+          <input type="text" value="Preenchida automaticamente ao gerar" disabled />
+        </div>
+      </div>
+
+      <fieldset class="rounded-md border border-slate-300 p-4">
+        <legend class="px-1 text-sm font-medium text-slate-700">Moeda</legend>
+        <div class="flex gap-6">
+          <label class="!inline-flex items-center gap-2 !text-sm !font-normal text-slate-700">
+            <input type="radio" name="moeda" value="usd" required class="!mt-0 !w-auto" />
+            Dólar (US$)
+          </label>
+          <label class="!inline-flex items-center gap-2 !text-sm !font-normal text-slate-700">
+            <input type="radio" name="moeda" value="eur" required class="!mt-0 !w-auto" />
+            Euro (€)
+          </label>
+        </div>
+      </fieldset>
+
+      <div>
+        <div class="mb-2 flex items-center justify-between">
+          <label class="!mb-0">Serviços (guest posts)</label>
+          <span class="text-sm text-slate-500">Total atual: <strong id="total-atual" class="text-white">—</strong></span>
+        </div>
+        <div class="overflow-x-auto rounded-md border border-slate-300">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 18%">ID</th>
+                <th>Link do guest post</th>
+                <th style="width: 16%">Total</th>
+                <th style="width: 3rem"></th>
+              </tr>
+            </thead>
+            <tbody id="servicos-body"></tbody>
+          </table>
+        </div>
+        <button type="button" id="btn-add-row" class="btn-secondary mt-3">+ Adicionar serviço</button>
+      </div>
+
+      <div>
+        <button type="button" id="btn-gerar" class="btn-primary" disabled>Gerar Invoice</button>
+      </div>
+    </form>
+  </section>
+
+  <template id="servico-row-template">
+    <tr class="servico-row">
+      <td><input type="text" class="input-servico-id" placeholder="Ex: 2891282" /></td>
+      <td><input type="url" class="input-servico-link" placeholder="https://..." /></td>
+      <td><input type="number" step="0.01" min="0" class="input-servico-total" placeholder="0.00" /></td>
+      <td class="text-center">
+        <button type="button" class="btn-remover-row link-danger" title="Remover linha" aria-label="Remover linha">✕</button>
+      </td>
+    </tr>
+  </template>
+
+  <section id="invoice-section" class="hidden">
+    <div class="no-print mb-4 flex gap-3">
+      <button type="button" id="btn-baixar-pdf" class="btn-primary">Baixar PDF</button>
+      <button type="button" id="btn-nova-invoice" class="btn-secondary">Gerar nova invoice</button>
+    </div>
+
+    <div id="invoice-print-area" class="invoice-scroll-wrapper">
+      <div class="invoice-page">
+        <div class="invoice-header-row">
+          <img src="/logo-invoice-gringos.png" alt="Meta Link" class="invoice-logo" />
+          <div class="invoice-title">INVOICE <span id="prev-cliente-nome"></span></div>
+        </div>
+
+        <div class="invoice-sender-block">
+          <div class="sender-name">META LINKBUILDING NEGÓCIOS DIGITAIS LTDA</div>
+          <div class="business-id">Business ID: 60.787.821/0001-41</div>
+          <div>AL SALVADOR, 1057</div>
+          <div>EDIF SALVADOR SHOPPING BUSINESS TORRE</div>
+          <div>CAMINHO DAS ARVORES</div>
+          <div>SALVADOR, BA</div>
+          <div>BRAZIL</div>
+          <div class="email-link">eduardo@metalinkbuilding.com.br</div>
+        </div>
+
+        <div class="invoice-meta-row">
+          <div class="billed-to">
+            <div class="label-teal">BILLED TO</div>
+            <div id="prev-billed-linha1"></div>
+            <div>Register code: <span id="prev-register-code"></span></div>
+            <div>VAT ID: <span id="prev-vat-id"></span></div>
+            <div id="prev-billed-cidade"></div>
+            <div id="prev-billed-complemento"></div>
+          </div>
+          <div class="invoice-numbers">
+            <div class="label-teal">INVOICE NUMBER</div>
+            <div id="prev-invoice-number"></div>
+            <div class="label-teal invoice-date-label">INVOICE DATE</div>
+            <div id="prev-invoice-date"></div>
+          </div>
+        </div>
+
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Description</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="prev-servicos-body"></tbody>
+        </table>
+
+        <div class="invoice-total-row">
+          <span class="label-teal">INVOICE TOTAL</span>
+          <span class="total-value" id="prev-invoice-total"></span>
+        </div>
+
+        <div class="paypal-block">
+          <div class="dark-teal">PAYPAL</div>
+          <div class="dark-teal">—--</div>
+        </div>
+      </div>
+
+      <div class="invoice-page invoice-page-2">
+        <div class="dark-teal bank-title">BANK ACCOUNT</div>
+
+        <div class="bank-field">
+          <div class="bank-label">Account holder name:</div>
+          <div>Daniel Braga</div>
+        </div>
+        <div class="bank-field">
+          <div class="bank-label">Account holder address:</div>
+          <div>22209 72nd St E</div>
+          <div>Buckley, WA</div>
+          <div>98321</div>
+          <div>United States</div>
+        </div>
+        <div class="bank-field">
+          <div class="bank-label">Type of Transfer):</div>
+          <div>ACH Transfer</div>
+        </div>
+        <div class="bank-field">
+          <div class="bank-label">Account number (US-only):</div>
+          <div>898075483592</div>
+        </div>
+        <div class="bank-field">
+          <div class="bank-label">Routing number (US-only):</div>
+          <div>063100277</div>
+        </div>
+        <div class="bank-field">
+          <div class="bank-label">Bank address:</div>
+          <div>Bank of America</div>
+          <div>222 Broadway, New York, NY 10038</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style is:global>
+  /* Réplica fiel do modelo MotherLink (fonte Arial, cores extraídas do .docx original) —
+     deliberadamente fora do design system dark/Tailwind do resto do app, já que precisa
+     reproduzir um documento externo pixel a pixel, não a UI do dashboard.
+     is:global (em vez de scoped): as linhas de serviço/tabela são criadas via JS
+     (document.createElement), então nunca recebem o atributo data-astro-cid que o
+     escopo de <style> do Astro exige para casar o seletor — escopo global evita isso. */
+  .invoice-scroll-wrapper {
+    overflow-x: auto;
+    padding-bottom: 1rem;
+  }
+
+  .invoice-page {
+    width: 800px;
+    min-width: 800px;
+    margin: 0 auto 2rem auto;
+    background: #ffffff;
+    color: #222222;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 48px 56px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .invoice-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .invoice-logo {
+    height: 46px;
+    width: auto;
+    display: block;
+  }
+
+  .invoice-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #000000;
+  }
+
+  .invoice-sender-block {
+    text-align: right;
+    margin-bottom: 32px;
+  }
+
+  .invoice-sender-block > div {
+    color: #222222;
+  }
+
+  .sender-name {
+    font-weight: 700;
+    color: #547880;
+  }
+
+  .business-id {
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+
+  .email-link {
+    color: #1155cc;
+    text-decoration: underline;
+  }
+
+  .invoice-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+
+  .invoice-meta-row > div {
+    color: #222222;
+  }
+
+  .invoice-numbers {
+    text-align: right;
+    min-width: 180px;
+  }
+
+  .invoice-date-label {
+    margin-top: 12px;
+  }
+
+  .label-teal {
+    font-weight: 700;
+    color: #51646d;
+    margin-bottom: 4px;
+  }
+
+  .invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+  }
+
+  .invoice-table th {
+    text-align: left;
+    font-weight: 700;
+    color: #51646d;
+    border: 1px solid #efefef;
+    padding: 8px 10px;
+    background: #ffffff;
+    font-size: 13px;
+    text-transform: none;
+  }
+
+  .invoice-table td {
+    border: 1px solid #efefef;
+    padding: 8px 10px;
+    color: #222222;
+    vertical-align: top;
+  }
+
+  .invoice-table a {
+    color: #1155cc;
+    text-decoration: underline;
+    word-break: break-all;
+  }
+
+  .invoice-total-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+
+  .total-value {
+    font-weight: 700;
+    font-size: 16px;
+    color: #000000;
+  }
+
+  .dark-teal {
+    font-weight: 700;
+    color: #205968;
+  }
+
+  .paypal-block > div + div {
+    margin-top: 4px;
+  }
+
+  .invoice-page-2 {
+    padding-top: 48px;
+  }
+
+  .bank-title {
+    font-size: 15px;
+    margin-bottom: 20px;
+  }
+
+  .bank-field {
+    margin-bottom: 16px;
+  }
+
+  .bank-label {
+    font-weight: 700;
+    color: #222222;
+    margin-bottom: 2px;
+  }
+</style>
+
+<style is:global>
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    #invoice-print-area,
+    #invoice-print-area * {
+      visibility: visible;
+    }
+    #invoice-print-area {
+      position: absolute;
+      top: 0;
+      left: 0;
+      overflow: visible;
+    }
+    .invoice-page {
+      box-shadow: none;
+      width: auto;
+      min-width: 0;
+      margin: 0;
+    }
+    .invoice-page-2 {
+      page-break-before: always;
+    }
+    .no-print {
+      display: none !important;
+    }
+  }
+</style>
+
+<script>
+  type Moeda = 'usd' | 'eur';
+
+  const form = document.getElementById('invoice-form') as HTMLFormElement;
+  const servicosBody = document.getElementById('servicos-body') as HTMLTableSectionElement;
+  const rowTemplate = document.getElementById('servico-row-template') as HTMLTemplateElement;
+  const btnAddRow = document.getElementById('btn-add-row') as HTMLButtonElement;
+  const btnGerar = document.getElementById('btn-gerar') as HTMLButtonElement;
+  const btnBaixarPdf = document.getElementById('btn-baixar-pdf') as HTMLButtonElement;
+  const btnNovaInvoice = document.getElementById('btn-nova-invoice') as HTMLButtonElement;
+  const totalAtualEl = document.getElementById('total-atual') as HTMLElement;
+  const formSection = document.getElementById('form-section') as HTMLElement;
+  const invoiceSection = document.getElementById('invoice-section') as HTMLElement;
+
+  function formatNumero(valor: number): string {
+    return Number.isInteger(valor) ? String(valor) : valor.toFixed(2);
+  }
+
+  function formatLinhaTotal(valor: number, moeda: Moeda): string {
+    return moeda === 'usd' ? `$${formatNumero(valor)} usd` : `€${formatNumero(valor)} eur`;
+  }
+
+  function formatTotalGeral(valor: number, moeda: Moeda): string {
+    return moeda === 'usd' ? `$ ${formatNumero(valor)} american dollars` : `€ ${formatNumero(valor)} euros`;
+  }
+
+  function moedaSelecionada(): Moeda | null {
+    const el = form.querySelector<HTMLInputElement>('input[name="moeda"]:checked');
+    return (el?.value as Moeda) ?? null;
+  }
+
+  function linhas(): HTMLTableRowElement[] {
+    return Array.from(servicosBody.querySelectorAll<HTMLTableRowElement>('.servico-row'));
+  }
+
+  function addRow(): void {
+    const fragment = rowTemplate.content.cloneNode(true) as DocumentFragment;
+    const row = fragment.querySelector('.servico-row') as HTMLTableRowElement;
+    row.querySelectorAll('input').forEach((input) => {
+      input.addEventListener('input', () => {
+        recalcularTotal();
+        validarFormulario();
+      });
+    });
+    row.querySelector('.btn-remover-row')?.addEventListener('click', () => {
+      row.remove();
+      recalcularTotal();
+      validarFormulario();
+    });
+    servicosBody.appendChild(row);
+  }
+
+  function recalcularTotal(): number {
+    const soma = linhas().reduce((acc, row) => {
+      const valor = parseFloat(row.querySelector<HTMLInputElement>('.input-servico-total')?.value ?? '');
+      return acc + (Number.isFinite(valor) ? valor : 0);
+    }, 0);
+    const moeda = moedaSelecionada();
+    totalAtualEl.textContent = moeda ? formatTotalGeral(soma, moeda) : formatNumero(soma);
+    return soma;
+  }
+
+  function linhaCompleta(row: HTMLTableRowElement): boolean {
+    const id = row.querySelector<HTMLInputElement>('.input-servico-id')?.value.trim();
+    const link = row.querySelector<HTMLInputElement>('.input-servico-link')?.value.trim();
+    const total = row.querySelector<HTMLInputElement>('.input-servico-total')?.value.trim();
+    return Boolean(id && link && total && parseFloat(total) > 0);
+  }
+
+  function validarFormulario(): void {
+    const camposObrigatorios = [
+      'cliente_nome',
+      'billed_linha1',
+      'register_code',
+      'vat_id',
+      'billed_cidade_pais',
+      'invoice_number'
+    ];
+    const todosPreenchidos = camposObrigatorios.every((nome) => {
+      const el = form.elements.namedItem(nome) as HTMLInputElement | null;
+      return Boolean(el?.value.trim());
+    });
+    const temMoeda = moedaSelecionada() !== null;
+    const temServicoValido = linhas().some(linhaCompleta);
+
+    btnGerar.disabled = !(todosPreenchidos && temMoeda && temServicoValido);
+  }
+
+  function preencherLink(container: HTMLElement, valor: string): void {
+    if (/^https?:\/\//i.test(valor)) {
+      const a = document.createElement('a');
+      a.href = valor;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = valor;
+      container.appendChild(a);
+    } else {
+      container.appendChild(document.createTextNode(valor));
+    }
+  }
+
+  function gerarInvoice(): void {
+    const moeda = moedaSelecionada();
+    if (!moeda) return;
+
+    const valor = (nome: string) => (form.elements.namedItem(nome) as HTMLInputElement)?.value.trim() ?? '';
+
+    document.getElementById('prev-cliente-nome')!.textContent = valor('cliente_nome');
+    document.getElementById('prev-billed-linha1')!.textContent = valor('billed_linha1');
+    document.getElementById('prev-register-code')!.textContent = valor('register_code');
+    document.getElementById('prev-vat-id')!.textContent = valor('vat_id');
+    document.getElementById('prev-billed-cidade')!.textContent = valor('billed_cidade_pais');
+    document.getElementById('prev-billed-complemento')!.textContent = valor('billed_complemento');
+    document.getElementById('prev-invoice-number')!.textContent = valor('invoice_number');
+    document.getElementById('prev-invoice-date')!.textContent = new Date().toLocaleDateString('pt-BR');
+
+    const corpo = document.getElementById('prev-servicos-body')!;
+    corpo.innerHTML = '';
+    let total = 0;
+    linhas()
+      .filter(linhaCompleta)
+      .forEach((row) => {
+        const id = row.querySelector<HTMLInputElement>('.input-servico-id')!.value.trim();
+        const link = row.querySelector<HTMLInputElement>('.input-servico-link')!.value.trim();
+        const valorLinha = parseFloat(row.querySelector<HTMLInputElement>('.input-servico-total')!.value);
+        total += valorLinha;
+
+        const tr = document.createElement('tr');
+
+        const tdId = document.createElement('td');
+        tdId.textContent = id;
+
+        const tdDesc = document.createElement('td');
+        tdDesc.appendChild(document.createTextNode('Guest Post on '));
+        preencherLink(tdDesc, link);
+
+        const tdTotal = document.createElement('td');
+        tdTotal.textContent = formatLinhaTotal(valorLinha, moeda);
+
+        tr.appendChild(tdId);
+        tr.appendChild(tdDesc);
+        tr.appendChild(tdTotal);
+        corpo.appendChild(tr);
+      });
+
+    document.getElementById('prev-invoice-total')!.textContent = formatTotalGeral(total, moeda);
+
+    formSection.classList.add('hidden');
+    invoiceSection.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetarFormulario(): void {
+    form.reset();
+    servicosBody.innerHTML = '';
+    addRow();
+    recalcularTotal();
+    validarFormulario();
+    invoiceSection.classList.add('hidden');
+    formSection.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  form.addEventListener('input', () => {
+    recalcularTotal();
+    validarFormulario();
+  });
+  form.addEventListener('change', () => {
+    recalcularTotal();
+    validarFormulario();
+  });
+
+  btnAddRow.addEventListener('click', () => {
+    addRow();
+    validarFormulario();
+  });
+  btnGerar.addEventListener('click', gerarInvoice);
+  btnBaixarPdf.addEventListener('click', () => window.print());
+  btnNovaInvoice.addEventListener('click', resetarFormulario);
+
+  addRow();
+  recalcularTotal();
+  validarFormulario();
+</script>

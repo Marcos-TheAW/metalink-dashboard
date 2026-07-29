@@ -263,6 +263,32 @@ path-prefix gate and each do their own explicit `usuario.papel !== 'admin'` chec
 fixed 6-row reference set (DR/pricing bands, negotiation red flags) — there's no create/delete UI for
 them, only edit.
 
+### Criação de Invoice para Clientes Gringos: the one page with real client-side JS
+
+`src/pages/faturas/gringos.astro` (nav: "Faturas" dropdown, no area gate — same `null`
+`areaDaRota()` bucket as `/minha-conta`, so any authenticated user can open it) is a deliberate
+exception to "plain HTML forms, no client JS": it's a stateless invoice generator (no D1 read/write
+at all), and the spec requires dynamic add/remove rows, a live running total, and instant
+render-without-reload, none of which fit the redirect-with-`?erro=` form pattern. All logic
+(row add/remove, live total, required-field validation gating the "Gerar Invoice" button, building
+the invoice preview DOM, `window.print()` for PDF export) lives in one `<script>` tag in that file.
+
+The invoice preview's `<style>` block is `is:global` **on purpose**, not an oversight: the service-row
+`<tr>`/`<td>` elements are built via `document.createElement` at generate-time, so they never get the
+`data-astro-cid-*` attribute Astro's scoped styles rely on to match — a scoped `.invoice-table td`
+rule would silently fail to match those rows and fall through to the app's dark-theme `td` base style
+(`src/styles/global.css`, which is exactly what happened during initial testing: line-item text
+rendered in the near-white "dark theme" `slate-600` instead of the invoice's actual near-black). The
+invoice's colors/fonts (`Arial`, `#51646d`/`#205968`/`#547880`/`#1155cc`/`#efefef` borders) were
+extracted directly from the source `MotherLink Invoice 04 - Meta Link Building.docx` XML, not
+eyeballed from the rendered PDF, and `public/logo-invoice-gringos.png` is the exact logo image
+extracted from that docx's `word/media/`, not the dashboard's own `/logo.png`. PDF export is
+`window.print()` against a dedicated `@media print` block (hide everything, show only
+`#invoice-print-area`, `page-break-before: always` on the bank-account block) rather than a
+client-side PDF library — deliberately, to keep real vector text/fidelity with zero new
+dependencies. The BANK ACCOUNT page and the sender block (Meta Linkbuilding's own CNPJ/address/logo)
+are 100% fixed content copied from that same docx; only the fields listed in the form are editable.
+
 ### D1 is already provisioned
 
 `wrangler.jsonc`'s `d1_databases[0].database_id` points at the real production D1 database
