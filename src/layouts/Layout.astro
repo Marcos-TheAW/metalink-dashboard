@@ -5,9 +5,10 @@ import { temAcessoArea, type Usuario } from '../lib/types';
 interface Props {
   title: string;
   usuario: Usuario;
+  wide?: boolean;
 }
 
-const { title, usuario } = Astro.props;
+const { title, usuario, wide = false } = Astro.props;
 
 const gruposNav = [
   {
@@ -139,7 +140,7 @@ const linksFaturas = [{ href: '/faturas/gringos', label: 'Criação de Invoice p
           </div>
         </div>
       </header>
-      <main class="mx-auto max-w-6xl px-6 py-8">
+      <main class={`mx-auto px-6 py-8 ${wide ? 'max-w-[100rem]' : 'max-w-6xl'}`}>
         <slot />
       </main>
     </div>

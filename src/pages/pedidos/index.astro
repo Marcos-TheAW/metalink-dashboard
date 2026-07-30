@@ -67,7 +67,7 @@ const totalLinks = pedidos.reduce((soma, p) => soma + p.qtd_links, 0);
 const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 0);
 ---
 
-<Layout title="Pedidos" usuario={usuario}>
+<Layout title="Pedidos" usuario={usuario} wide>
   <div class="mb-6 flex items-center justify-between">
     <h1>Pedidos</h1>
     <a href="/pedidos/novo" class="btn-primary">Novo pedido</a>
@@ -167,7 +167,7 @@ const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 
     <KpiCard label="Valor total (filtro atual)" value={centavosParaReais(totalValorCentavos)} />
   </section>
 
-  <div class="card overflow-x-auto max-h-[70vh] overflow-y-auto">
+  <div class="card overflow-x-auto max-h-[70vh] overflow-y-auto pt-0">
     <table>
       <thead>
         <tr>
@@ -212,7 +212,7 @@ const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 
                   '—'
                 )}
               </td>
-              <td>
+              <td class="overflow-visible">
                 <details class="relative">
                   <summary
                     class="cursor-pointer list-none rounded px-1.5 py-0.5 leading-none text-slate-400 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"

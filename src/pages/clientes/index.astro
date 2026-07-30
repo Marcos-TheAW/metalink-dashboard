@@ -33,7 +33,7 @@ const clientes = await listClientesStatus();
     </form>
   </details>
 
-  <div class="card overflow-x-auto max-h-[70vh] overflow-y-auto">
+  <div class="card overflow-x-auto max-h-[70vh] overflow-y-auto pt-0">
     <table>
       <thead>
         <tr>
@@ -52,7 +52,7 @@ const clientes = await listClientesStatus();
         {
           clientes.map((c) => (
             <tr>
-              <td class="font-medium text-slate-900">
+              <td class="overflow-visible font-medium text-slate-900">
                 <div class="flex items-center gap-1">
                   <details class="relative">
                     <summary
@@ -77,7 +77,7 @@ const clientes = await listClientesStatus();
                       </form>
                     </div>
                   </details>
-                  <span>{c.nome}</span>
+                  <span class="min-w-0 truncate" title={c.nome}>{c.nome}</span>
                 </div>
               </td>
               <td>
