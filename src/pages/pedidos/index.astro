@@ -67,7 +67,7 @@ const totalLinks = pedidos.reduce((soma, p) => soma + p.qtd_links, 0);
 const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 0);
 ---
 
-<Layout title="Pedidos" usuario={usuario} wide>
+<Layout title="Pedidos" usuario={usuario}>
   <div class="mb-6 flex items-center justify-between">
     <h1>Pedidos</h1>
     <a href="/pedidos/novo" class="btn-primary">Novo pedido</a>

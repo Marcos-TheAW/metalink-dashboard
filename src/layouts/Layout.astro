@@ -5,10 +5,9 @@ import { temAcessoArea, type Usuario } from '../lib/types';
 interface Props {
   title: string;
   usuario: Usuario;
-  wide?: boolean;
 }
 
-const { title, usuario, wide = false } = Astro.props;
+const { title, usuario } = Astro.props;
 
 const gruposNav = [
   {
@@ -56,7 +55,7 @@ const linksFaturas = [{ href: '/faturas/gringos', label: 'Criação de Invoice p
   <body>
     <div class="min-h-screen">
       <header class="border-b border-slate-300 bg-slate-100">
-        <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+        <div class="mx-auto flex max-w-[100rem] items-center justify-between px-6 py-3">
           <nav class="flex gap-1">
             {
               gruposNav.map((grupo) => (
@@ -140,7 +139,7 @@ const linksFaturas = [{ href: '/faturas/gringos', label: 'Criação de Invoice p
           </div>
         </div>
       </header>
-      <main class={`mx-auto px-6 py-8 ${wide ? 'max-w-[100rem]' : 'max-w-6xl'}`}>
+      <main class="mx-auto max-w-[100rem] px-6 py-8">
         <slot />
       </main>
     </div>
