@@ -49,11 +49,18 @@
   }
 
   table {
-    @apply w-full border-collapse text-sm;
+    /* min-w-max soma com w-full: tabelas estreitas continuam esticando pra
+       largura do card, mas tabelas com muitas colunas (ex: Pedidos) não são
+       mais espremidas — passam a exigir o scroll horizontal do wrapper
+       .overflow-x-auto em vez de cortar/quebrar a última coluna. */
+    @apply w-full min-w-max border-collapse text-sm;
   }
 
   th {
-    @apply border-b border-brand-700 bg-brand-500 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white;
+    /* Cabeçalho fixo: sticky ao topo da viewport (o header do app não é
+       fixed, então top-0 gruda certinho assim que a tabela passa por baixo
+       dele ao rolar a página). */
+    @apply sticky top-0 z-10 border-b border-brand-700 bg-brand-500 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white;
   }
 
   td {

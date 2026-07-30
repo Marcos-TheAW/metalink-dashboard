@@ -327,6 +327,8 @@ export interface FiltrosPedidos {
   dataFim?: string;
   prazoInicio?: string;
   prazoFim?: string;
+  dataPagamentoInicio?: string;
+  dataPagamentoFim?: string;
 }
 
 export interface PedidoComCliente extends Pedido {
@@ -350,65 +352,83 @@ const DATA_PAGAMENTO_REALIZADO_SQL = `
 `;
 
 export async function listPedidos(filtros: FiltrosPedidos = {}): Promise<PedidoComCliente[]> {
+  // CTE em vez de filtrar direto em `p.*`: data_pagamento_realizado é uma coluna calculada
+  // (subquery correlacionada), e um filtro nela só pode referenciar o nome já resolvido se
+  // vier de uma camada anterior no plano de consulta — daí o WHERE rodar sobre `base`, não
+  // sobre `pedidos p` diretamente.
   const clauses: string[] = [];
   const params: unknown[] = [];
   const statusValues = filtros.status ? (Array.isArray(filtros.status) ? filtros.status : [filtros.status]) : [];
   if (statusValues.length > 0) {
-    clauses.push(`p.status IN (${statusValues.map(() => '?').join(',')})`);
+    clauses.push(`status IN (${statusValues.map(() => '?').join(',')})`);
     params.push(...statusValues);
   }
   if (filtros.canal) {
-    clauses.push('p.canal = ?');
+    clauses.push('canal = ?');
     params.push(filtros.canal);
   }
   if (filtros.cliente_id) {
-    clauses.push('p.cliente_id = ?');
+    clauses.push('cliente_id = ?');
     params.push(filtros.cliente_id);
   }
   if (filtros.semana) {
-    clauses.push(`${SEGUNDA_FEIRA_SQL('p.data_pedido')} = ?`);
+    clauses.push(`${SEGUNDA_FEIRA_SQL('data_pedido')} = ?`);
     params.push(filtros.semana);
   }
   if (filtros.qtdLinksMin !== undefined) {
-    clauses.push('p.qtd_links >= ?');
+    clauses.push('qtd_links >= ?');
     params.push(filtros.qtdLinksMin);
   }
   if (filtros.qtdLinksMax !== undefined) {
-    clauses.push('p.qtd_links <= ?');
+    clauses.push('qtd_links <= ?');
     params.push(filtros.qtdLinksMax);
   }
   if (filtros.valorMinCentavos !== undefined) {
-    clauses.push('p.valor_centavos >= ?');
+    clauses.push('valor_centavos >= ?');
     params.push(filtros.valorMinCentavos);
   }
   if (filtros.valorMaxCentavos !== undefined) {
-    clauses.push('p.valor_centavos <= ?');
+    clauses.push('valor_centavos <= ?');
     params.push(filtros.valorMaxCentavos);
   }
   if (filtros.dataInicio) {
-    clauses.push('p.data_pedido >= ?');
+    clauses.push('data_pedido >= ?');
     params.push(filtros.dataInicio);
   }
   if (filtros.dataFim) {
-    clauses.push('p.data_pedido <= ?');
+    clauses.push('data_pedido <= ?');
     params.push(filtros.dataFim);
   }
   if (filtros.prazoInicio) {
-    clauses.push('p.prazo_entrega >= ?');
+    clauses.push('prazo_entrega >= ?');
     params.push(filtros.prazoInicio);
   }
   if (filtros.prazoFim) {
-    clauses.push('p.prazo_entrega <= ?');
+    clauses.push('prazo_entrega <= ?');
     params.push(filtros.prazoFim);
+  }
+  if (filtros.dataPagamentoInicio) {
+    // date(...) trunca o datetime de data_pagamento_realizado pra comparar só a data —
+    // sem isso, um "até" na mesma data do pagamento excluiria a linha (string de datetime
+    // completo é lexicograficamente "maior" que a data pura).
+    clauses.push('date(data_pagamento_realizado) >= ?');
+    params.push(filtros.dataPagamentoInicio);
+  }
+  if (filtros.dataPagamentoFim) {
+    clauses.push('date(data_pagamento_realizado) <= ?');
+    params.push(filtros.dataPagamentoFim);
   }
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const { results } = await db()
     .prepare(
-      `SELECT p.*, c.nome AS cliente_nome, ${DATA_PAGAMENTO_REALIZADO_SQL} AS data_pagamento_realizado
-       FROM pedidos p
-       JOIN clientes c ON c.id = p.cliente_id
+      `WITH base AS (
+         SELECT p.*, c.nome AS cliente_nome, ${DATA_PAGAMENTO_REALIZADO_SQL} AS data_pagamento_realizado
+         FROM pedidos p
+         JOIN clientes c ON c.id = p.cliente_id
+       )
+       SELECT * FROM base
        ${where}
-       ORDER BY p.data_pedido DESC, p.id DESC`
+       ORDER BY data_pedido DESC, id DESC`
     )
     .bind(...params)
     .all<PedidoComCliente>();

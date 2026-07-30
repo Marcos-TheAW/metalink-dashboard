@@ -321,6 +321,9 @@ const usuario = Astro.locals.usuario;
   }
 
   .invoice-table th {
+    /* Documento estático (preview + impressão) — não deve herdar o sticky/z-index
+       do <th> global do resto do dashboard. */
+    position: static;
     text-align: left;
     font-weight: 700;
     color: #51646d;

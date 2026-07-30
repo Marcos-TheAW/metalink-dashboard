@@ -38,6 +38,8 @@ const dataInicio = url.searchParams.get('data_inicio') ?? '';
 const dataFim = url.searchParams.get('data_fim') ?? '';
 const prazoInicio = url.searchParams.get('prazo_inicio') ?? '';
 const prazoFim = url.searchParams.get('prazo_fim') ?? '';
+const dataPagamentoInicio = url.searchParams.get('data_pagamento_inicio') ?? '';
+const dataPagamentoFim = url.searchParams.get('data_pagamento_fim') ?? '';
 
 const [pedidos, clientes, semanas] = await Promise.all([
   listPedidos({
@@ -52,7 +54,9 @@ const [pedidos, clientes, semanas] = await Promise.all([
     dataInicio: dataInicio || undefined,
     dataFim: dataFim || undefined,
     prazoInicio: prazoInicio || undefined,
-    prazoFim: prazoFim || undefined
+    prazoFim: prazoFim || undefined,
+    dataPagamentoInicio: dataPagamentoInicio || undefined,
+    dataPagamentoFim: dataPagamentoFim || undefined
   }),
   listClientes(),
   listSemanasPedidos()
@@ -141,6 +145,14 @@ const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 
           <input type="date" name="prazo_fim" value={prazoFim} class="mt-0 w-full min-w-0" />
         </div>
       </div>
+      <div>
+        <label>Data Pagamento Realizado</label>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="date" name="data_pagamento_inicio" value={dataPagamentoInicio} class="mt-0 w-full min-w-0" />
+          <span class="shrink-0 text-slate-500">–</span>
+          <input type="date" name="data_pagamento_fim" value={dataPagamentoFim} class="mt-0 w-full min-w-0" />
+        </div>
+      </div>
     </div>
 
     <div class="flex gap-3">
@@ -155,7 +167,7 @@ const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 
     <KpiCard label="Valor total (filtro atual)" value={centavosParaReais(totalValorCentavos)} />
   </section>
 
-  <div class="card overflow-x-auto">
+  <div class="card overflow-x-auto max-h-[70vh] overflow-y-auto">
     <table>
       <thead>
         <tr>
@@ -200,14 +212,27 @@ const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 
                   '—'
                 )}
               </td>
-              <td class="whitespace-nowrap">
-                <a href={`/pedidos/${p.id}`} class="text-brand-600 hover:underline text-sm">Editar</a>
-                <span class="mx-1.5 text-slate-300">·</span>
-                <BotaoExcluir
-                  action={`/api/pedidos/${p.id}/excluir`}
-                  mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o pedido de ${p.cliente_nome} (${p.data_pedido})? Todos os dados desse pedido serão perdidos permanentemente.`}
-                  compacto
-                />
+              <td>
+                <details class="relative">
+                  <summary
+                    class="cursor-pointer list-none rounded px-1.5 py-0.5 leading-none text-slate-400 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                    aria-label="Ações do pedido"
+                  >
+                    ⋮
+                  </summary>
+                  <div class="absolute right-0 z-10 mt-1 w-36 rounded-md border border-slate-300 bg-slate-100 py-1 shadow-lg">
+                    <a href={`/pedidos/${p.id}`} class="block px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-200 hover:text-white">
+                      Editar
+                    </a>
+                    <div class="px-3 py-1.5">
+                      <BotaoExcluir
+                        action={`/api/pedidos/${p.id}/excluir`}
+                        mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o pedido de ${p.cliente_nome} (${p.data_pedido})? Todos os dados desse pedido serão perdidos permanentemente.`}
+                        compacto
+                      />
+                    </div>
+                  </div>
+                </details>
               </td>
             </tr>
           ))
