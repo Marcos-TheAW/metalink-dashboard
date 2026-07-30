@@ -49,18 +49,18 @@
   }
 
   table {
-    /* min-w-max soma com w-full: tabelas estreitas continuam esticando pra
-       largura do card, mas tabelas com muitas colunas (ex: Pedidos) não são
-       mais espremidas — passam a exigir o scroll horizontal do wrapper
-       .overflow-x-auto em vez de cortar/quebrar a última coluna. */
-    @apply w-full min-w-max border-collapse text-sm;
+    @apply w-full border-collapse text-sm;
   }
 
   th {
     /* Cabeçalho fixo: sticky ao topo da viewport (o header do app não é
        fixed, então top-0 gruda certinho assim que a tabela passa por baixo
-       dele ao rolar a página). */
-    @apply sticky top-0 z-10 border-b border-brand-700 bg-brand-500 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white;
+       dele ao rolar a página). Sem min-w-max na tabela, o layout automático
+       encolhe as colunas pra caber na largura do card — whitespace-normal
+       deixa o texto do título quebrar em várias linhas em vez de forçar
+       scroll horizontal (troca deliberada: cabeçalho mais alto > barra
+       lateral pra ler a última coluna). */
+    @apply sticky top-0 z-10 whitespace-normal border-b border-brand-700 bg-brand-500 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white;
   }
 
   td {
