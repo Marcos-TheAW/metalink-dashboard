@@ -8,7 +8,8 @@ export type StatusPedido =
   | 'aguardando_publicacao'
   | 'entregue'
   | 'pagamento_realizado'
-  | 'com_problema';
+  | 'com_problema'
+  | 'perdido';
 
 export type CanalComercial = 'whatsapp' | 'email' | 'facebook';
 
@@ -42,7 +43,8 @@ export const STATUS_PEDIDO: { value: StatusPedido; label: string }[] = [
   { value: 'aguardando_publicacao', label: 'Aguardando Publicação' },
   { value: 'entregue', label: 'Entregue' },
   { value: 'pagamento_realizado', label: 'Pagamento Realizado' },
-  { value: 'com_problema', label: 'Com Problema' }
+  { value: 'com_problema', label: 'Com Problema' },
+  { value: 'perdido', label: 'Perdido' }
 ];
 
 export const CANAIS_COMERCIAIS: { value: CanalComercial; label: string }[] = [
@@ -81,6 +83,16 @@ export function labelFor(list: { value: string; label: string }[], value: string
 
 export function centavosParaReais(centavos: number): string {
   return (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+// Aceita variações comuns coladas pelo usuário ("http://", "www.", ou só o domínio)
+// e sempre normaliza para "https://" — a validação de URL bem formada roda depois,
+// no chamador, via `new URL(...)`.
+export function normalizarUrl(valor: string): string {
+  const semEspacos = valor.trim();
+  if (!semEspacos) return semEspacos;
+  const semProtocolo = semEspacos.replace(/^https?:\/\//i, '');
+  return `https://${semProtocolo}`;
 }
 
 export function formatarDataBR(dataISO: string | null): string {

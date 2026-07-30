@@ -315,7 +315,7 @@ async function registrarHistorico(
 // ---------- Pedidos ----------
 
 export interface FiltrosPedidos {
-  status?: string;
+  status?: string | string[];
   canal?: string;
   cliente_id?: number;
   semana?: string;
@@ -331,17 +331,31 @@ export interface FiltrosPedidos {
 
 export interface PedidoComCliente extends Pedido {
   cliente_nome: string;
+  data_pagamento_realizado: string | null;
 }
 
 const SEGUNDA_FEIRA_SQL = (coluna: string) =>
   `date(${coluna}, '-' || ((CAST(strftime('%w', ${coluna}) AS INTEGER) + 6) % 7) || ' days')`;
 
+// Data em que o pedido passou a "Pagamento Realizado": o historico_alteracoes só grava uma
+// linha em atualizações (não na criação), então um pedido já criado nesse status usa o
+// próprio criado_em como fallback. Em caso de ida-e-volta de status, usa a transição mais
+// recente para esse valor.
+const DATA_PAGAMENTO_REALIZADO_SQL = `
+  COALESCE(
+    (SELECT MAX(h.criado_em) FROM historico_alteracoes h
+      WHERE h.tabela = 'pedidos' AND h.registro_id = p.id AND h.campo = 'status' AND h.valor_novo = 'pagamento_realizado'),
+    CASE WHEN p.status = 'pagamento_realizado' THEN p.criado_em ELSE NULL END
+  )
+`;
+
 export async function listPedidos(filtros: FiltrosPedidos = {}): Promise<PedidoComCliente[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
-  if (filtros.status) {
-    clauses.push('p.status = ?');
-    params.push(filtros.status);
+  const statusValues = filtros.status ? (Array.isArray(filtros.status) ? filtros.status : [filtros.status]) : [];
+  if (statusValues.length > 0) {
+    clauses.push(`p.status IN (${statusValues.map(() => '?').join(',')})`);
+    params.push(...statusValues);
   }
   if (filtros.canal) {
     clauses.push('p.canal = ?');
@@ -390,7 +404,7 @@ export async function listPedidos(filtros: FiltrosPedidos = {}): Promise<PedidoC
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const { results } = await db()
     .prepare(
-      `SELECT p.*, c.nome AS cliente_nome
+      `SELECT p.*, c.nome AS cliente_nome, ${DATA_PAGAMENTO_REALIZADO_SQL} AS data_pagamento_realizado
        FROM pedidos p
        JOIN clientes c ON c.id = p.cliente_id
        ${where}
@@ -414,6 +428,33 @@ export async function listSemanasPedidos(): Promise<string[]> {
 
 export async function getPedido(id: number): Promise<Pedido | null> {
   const row = await db().prepare('SELECT * FROM pedidos WHERE id = ?').bind(id).first<Pedido>();
+  return row ?? null;
+}
+
+export interface PedidoDuplicado {
+  id: number;
+  data_pedido: string;
+}
+
+// Mesmo cliente + mesmo valor + mesmo link já cadastrados = provável pedido duplicado.
+// Só entra em ação quando há link para comparar (link_detalhe vazio é ambíguo demais
+// pra bloquear sozinho). `excluirId` deixa de fora o próprio registro numa edição.
+export async function existePedidoDuplicado(
+  clienteId: number,
+  valorCentavos: number,
+  linkDetalhe: string | null,
+  excluirId?: number
+): Promise<PedidoDuplicado | null> {
+  if (!linkDetalhe) return null;
+  const row = await db()
+    .prepare(
+      `SELECT id, data_pedido FROM pedidos
+        WHERE cliente_id = ? AND valor_centavos = ? AND link_detalhe = ?
+          AND (?4 IS NULL OR id != ?4)
+        LIMIT 1`
+    )
+    .bind(clienteId, valorCentavos, linkDetalhe, excluirId ?? null)
+    .first<PedidoDuplicado>();
   return row ?? null;
 }
 

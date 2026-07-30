@@ -63,7 +63,7 @@ const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome
 
           <div class="sm:col-span-2">
             <label for="link_detalhe">Link da Planilha de Detalhe</label>
-            <input type="url" id="link_detalhe" name="link_detalhe" value={pedido.link_detalhe ?? ''} placeholder="https://…" />
+            <input type="text" id="link_detalhe" name="link_detalhe" value={pedido.link_detalhe ?? ''} placeholder="https://… (aceita também www. ou só o domínio)" />
           </div>
 
           <div class="sm:col-span-2">

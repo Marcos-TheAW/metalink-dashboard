@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { criarPedido } from '../../../lib/db';
-import { CANAIS, STATUS_PEDIDO } from '../../../lib/types';
+import { criarPedido, existePedidoDuplicado } from '../../../lib/db';
+import { CANAIS, STATUS_PEDIDO, formatarDataBR, normalizarUrl } from '../../../lib/types';
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const form = await request.formData();
@@ -12,7 +12,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const dataPedido = String(form.get('data_pedido') ?? '');
   const prazoEntrega = String(form.get('prazo_entrega') ?? '').trim() || null;
   const status = String(form.get('status') ?? '');
-  const linkDetalhe = String(form.get('link_detalhe') ?? '').trim() || null;
+  const linkDetalheBruto = String(form.get('link_detalhe') ?? '').trim();
+  const linkDetalhe = linkDetalheBruto ? normalizarUrl(linkDetalheBruto) : null;
   const observacao = String(form.get('observacao') ?? '').trim() || null;
   const responsavelIdRaw = String(form.get('responsavel_id') ?? '');
   const responsavelId = responsavelIdRaw ? Number(responsavelIdRaw) : null;
@@ -25,6 +26,22 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!dataPedido) erros.push('Data do pedido é obrigatória.');
   if (!Number.isFinite(valorCentavos) || valorCentavos <= 0) erros.push('Valor deve ser maior que zero.');
   if (!Number.isFinite(qtdLinks) || qtdLinks < 1) erros.push('Quantidade de links deve ser ao menos 1.');
+  if (linkDetalhe) {
+    try {
+      new URL(linkDetalhe);
+    } catch {
+      erros.push('Link da planilha de detalhe inválido.');
+    }
+  }
+
+  if (erros.length === 0 && clienteId && Number.isFinite(valorCentavos)) {
+    const duplicado = await existePedidoDuplicado(clienteId, valorCentavos, linkDetalhe);
+    if (duplicado) {
+      erros.push(
+        `Já existe um pedido idêntico (mesmo cliente, valor e link) cadastrado em ${formatarDataBR(duplicado.data_pedido)} — pedido #${duplicado.id}. Se for um pedido novo de verdade, ajuste o valor ou o link antes de salvar.`
+      );
+    }
+  }
 
   if (erros.length > 0) {
     return redirect(`/pedidos/novo?erro=${encodeURIComponent(erros.join(' '))}`);
