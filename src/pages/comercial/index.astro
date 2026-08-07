@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import FiltrosCard from '../../components/FiltrosCard.astro';
 import StatusBadge from '../../components/StatusBadge.astro';
 import { listAcoes, listClientes } from '../../lib/db';
 import {
@@ -24,6 +25,8 @@ const [acoes, clientes] = await Promise.all([
   listAcoes({ tipo: tipo || undefined, resultado: resultado || undefined, canal: canal || undefined, cliente_id: clienteId }),
   listClientes()
 ]);
+
+const filtrosAtivos = [tipo, resultado, canal, clienteIdRaw].filter(Boolean).length;
 ---
 
 <Layout title="Ações Comerciais" usuario={usuario}>
@@ -32,39 +35,42 @@ const [acoes, clientes] = await Promise.all([
     <a href="/comercial/novo" class="btn-primary">Nova ação</a>
   </div>
 
-  <form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-    <div>
-      <label for="tipo">Tipo de Ação</label>
-      <select id="tipo" name="tipo">
-        <option value="">Todos</option>
-        {TIPOS_ACAO.map((t) => <option value={t.value} selected={t.value === tipo}>{t.label}</option>)}
-      </select>
-    </div>
-    <div>
-      <label for="resultado">Resultado</label>
-      <select id="resultado" name="resultado">
-        <option value="">Todos</option>
-        {RESULTADOS_ACAO.map((r) => <option value={r.value} selected={r.value === resultado}>{r.label}</option>)}
-      </select>
-    </div>
-    <div>
-      <label for="canal">Canal</label>
-      <select id="canal" name="canal">
-        <option value="">Todos</option>
-        {CANAIS_COMERCIAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
-      </select>
-    </div>
-    <div>
-      <label for="cliente_id">Cliente / Prospect</label>
-      <select id="cliente_id" name="cliente_id">
-        <option value="">Todos</option>
-        {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
-      </select>
-    </div>
-    <div class="flex items-end">
-      <button type="submit" class="btn-secondary w-full">Filtrar</button>
-    </div>
-  </form>
+  <FiltrosCard ativos={filtrosAtivos}>
+    <form method="get" class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div>
+        <label for="tipo">Tipo de Ação</label>
+        <select id="tipo" name="tipo">
+          <option value="">Todos</option>
+          {TIPOS_ACAO.map((t) => <option value={t.value} selected={t.value === tipo}>{t.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="resultado">Resultado</label>
+        <select id="resultado" name="resultado">
+          <option value="">Todos</option>
+          {RESULTADOS_ACAO.map((r) => <option value={r.value} selected={r.value === resultado}>{r.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="canal">Canal</label>
+        <select id="canal" name="canal">
+          <option value="">Todos</option>
+          {CANAIS_COMERCIAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="cliente_id">Cliente / Prospect</label>
+        <select id="cliente_id" name="cliente_id">
+          <option value="">Todos</option>
+          {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
+        </select>
+      </div>
+      <div class="flex items-end gap-3">
+        <button type="submit" class="btn-primary w-full">Filtrar</button>
+        <a href="/comercial" class="btn-secondary w-full">Limpar</a>
+      </div>
+    </form>
+  </FiltrosCard>
 
   <div class="card overflow-x-auto max-h-[70vh] overflow-y-auto pt-0">
     <table>

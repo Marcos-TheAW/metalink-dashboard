@@ -1,0 +1,32 @@
+---
+/**
+ * Card de filtros recolhível — mesmo padrão <details>/<summary> do
+ * "Cadastrar novo cliente" em /clientes, para as tabelas longas ganharem
+ * altura de tela quando os filtros não estão em uso.
+ *
+ * `ativos` é a quantidade de filtros preenchidos na requisição atual: quando
+ * > 0 o painel já abre expandido, senão o usuário recolheria os filtros e
+ * perderia de vista o que está limitando a tabela.
+ */
+interface Props {
+  ativos?: number;
+}
+
+const { ativos = 0 } = Astro.props;
+---
+
+<details class="card mb-6" open={ativos > 0}>
+  <summary class="cursor-pointer text-sm font-medium text-slate-700">
+    Filtros
+    {
+      ativos > 0 && (
+        <span class="ml-2 rounded-full bg-brand-500 px-2 py-0.5 text-xs font-medium text-white">
+          {ativos} {ativos === 1 ? 'ativo' : 'ativos'}
+        </span>
+      )
+    }
+  </summary>
+  <div class="mt-4">
+    <slot />
+  </div>
+</details>

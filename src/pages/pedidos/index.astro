@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import BotaoExcluir from '../../components/BotaoExcluir.astro';
+import FiltrosCard from '../../components/FiltrosCard.astro';
 import KpiCard from '../../components/KpiCard.astro';
 import StatusBadge from '../../components/StatusBadge.astro';
 import { listClientes, listPedidos, listSemanasPedidos } from '../../lib/db';
@@ -65,6 +66,23 @@ const [pedidos, clientes, semanas] = await Promise.all([
 const totalPedidos = pedidos.length;
 const totalLinks = pedidos.reduce((soma, p) => soma + p.qtd_links, 0);
 const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 0);
+
+const filtrosAtivos = [
+  statusSelecionados.length > 0,
+  canal,
+  semana,
+  clienteIdRaw,
+  qtdLinksMin !== undefined,
+  qtdLinksMax !== undefined,
+  valorMinTexto,
+  valorMaxTexto,
+  dataInicio,
+  dataFim,
+  prazoInicio,
+  prazoFim,
+  dataPagamentoInicio,
+  dataPagamentoFim
+].filter(Boolean).length;
 ---
 
 <Layout title="Pedidos" usuario={usuario}>
@@ -73,93 +91,95 @@ const totalValorCentavos = pedidos.reduce((soma, p) => soma + p.valor_centavos, 
     <a href="/pedidos/novo" class="btn-primary">Novo pedido</a>
   </div>
 
-  <form method="get" class="card mb-6 flex flex-col gap-4">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
-      <div>
-        <label for="semana">Semana (segunda)</label>
-        <select id="semana" name="semana">
-          <option value="">Todas</option>
-          {semanas.map((s) => <option value={s} selected={s === semana}>{formatarDataBR(s)}</option>)}
-        </select>
+  <FiltrosCard ativos={filtrosAtivos}>
+    <form method="get" class="flex flex-col gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div>
+          <label for="semana">Semana (segunda)</label>
+          <select id="semana" name="semana">
+            <option value="">Todas</option>
+            {semanas.map((s) => <option value={s} selected={s === semana}>{formatarDataBR(s)}</option>)}
+          </select>
+        </div>
+        <div>
+          <label for="cliente_id">Cliente</label>
+          <select id="cliente_id" name="cliente_id">
+            <option value="">Todos</option>
+            {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
+          </select>
+        </div>
+        <div>
+          <label for="canal">Canal de Origem</label>
+          <select id="canal" name="canal">
+            <option value="">Todos</option>
+            {CANAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
+          </select>
+        </div>
       </div>
-      <div>
-        <label for="cliente_id">Cliente</label>
-        <select id="cliente_id" name="cliente_id">
-          <option value="">Todos</option>
-          {clientes.map((c) => <option value={c.id} selected={c.id === clienteId}>{c.nome}</option>)}
-        </select>
-      </div>
-      <div>
-        <label for="canal">Canal de Origem</label>
-        <select id="canal" name="canal">
-          <option value="">Todos</option>
-          {CANAIS.map((c) => <option value={c.value} selected={c.value === canal}>{c.label}</option>)}
-        </select>
-      </div>
-    </div>
 
-    <fieldset class="m-0 border-0 p-0">
-      <legend class="mb-1 block text-sm font-medium text-slate-700">Status do Pedido</legend>
-      <div class="flex flex-wrap gap-x-4 gap-y-2">
-        {
-          STATUS_PEDIDO.map((s) => (
-            <label class="!inline-flex items-center gap-1.5 !text-sm !font-normal text-slate-600">
-              <input type="checkbox" name="status" value={s.value} checked={statusSelecionados.includes(s.value)} class="!mt-0 !w-auto" />
-              {s.label}
-            </label>
-          ))
-        }
-      </div>
-    </fieldset>
+      <fieldset class="m-0 border-0 p-0">
+        <legend class="mb-1 block text-sm font-medium text-slate-700">Status do Pedido</legend>
+        <div class="flex flex-wrap gap-x-4 gap-y-2">
+          {
+            STATUS_PEDIDO.map((s) => (
+              <label class="!inline-flex items-center gap-1.5 !text-sm !font-normal text-slate-600">
+                <input type="checkbox" name="status" value={s.value} checked={statusSelecionados.includes(s.value)} class="!mt-0 !w-auto" />
+                {s.label}
+              </label>
+            ))
+          }
+        </div>
+      </fieldset>
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div>
-        <label>Quantidade de Links</label>
-        <div class="mt-1 flex items-center gap-2">
-          <input type="number" name="qtd_links_min" min="0" placeholder="De" value={qtdLinksMin ?? ''} class="mt-0 w-full min-w-0" />
-          <span class="shrink-0 text-slate-500">–</span>
-          <input type="number" name="qtd_links_max" min="0" placeholder="Até" value={qtdLinksMax ?? ''} class="mt-0 w-full min-w-0" />
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label>Quantidade de Links</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input type="number" name="qtd_links_min" min="0" placeholder="De" value={qtdLinksMin ?? ''} class="mt-0 w-full min-w-0" />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input type="number" name="qtd_links_max" min="0" placeholder="Até" value={qtdLinksMax ?? ''} class="mt-0 w-full min-w-0" />
+          </div>
+        </div>
+        <div>
+          <label>Valor Total (R$)</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input type="number" name="valor_min" min="0" step="0.01" placeholder="De" value={valorMinTexto} class="mt-0 w-full min-w-0" />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input type="number" name="valor_max" min="0" step="0.01" placeholder="Até" value={valorMaxTexto} class="mt-0 w-full min-w-0" />
+          </div>
+        </div>
+        <div>
+          <label>Data do Pedido</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input type="date" name="data_inicio" value={dataInicio} class="mt-0 w-full min-w-0" />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input type="date" name="data_fim" value={dataFim} class="mt-0 w-full min-w-0" />
+          </div>
+        </div>
+        <div>
+          <label>Prazo de Entrega</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input type="date" name="prazo_inicio" value={prazoInicio} class="mt-0 w-full min-w-0" />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input type="date" name="prazo_fim" value={prazoFim} class="mt-0 w-full min-w-0" />
+          </div>
+        </div>
+        <div>
+          <label>Data Pagamento Realizado</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input type="date" name="data_pagamento_inicio" value={dataPagamentoInicio} class="mt-0 w-full min-w-0" />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input type="date" name="data_pagamento_fim" value={dataPagamentoFim} class="mt-0 w-full min-w-0" />
+          </div>
         </div>
       </div>
-      <div>
-        <label>Valor Total (R$)</label>
-        <div class="mt-1 flex items-center gap-2">
-          <input type="number" name="valor_min" min="0" step="0.01" placeholder="De" value={valorMinTexto} class="mt-0 w-full min-w-0" />
-          <span class="shrink-0 text-slate-500">–</span>
-          <input type="number" name="valor_max" min="0" step="0.01" placeholder="Até" value={valorMaxTexto} class="mt-0 w-full min-w-0" />
-        </div>
-      </div>
-      <div>
-        <label>Data do Pedido</label>
-        <div class="mt-1 flex items-center gap-2">
-          <input type="date" name="data_inicio" value={dataInicio} class="mt-0 w-full min-w-0" />
-          <span class="shrink-0 text-slate-500">–</span>
-          <input type="date" name="data_fim" value={dataFim} class="mt-0 w-full min-w-0" />
-        </div>
-      </div>
-      <div>
-        <label>Prazo de Entrega</label>
-        <div class="mt-1 flex items-center gap-2">
-          <input type="date" name="prazo_inicio" value={prazoInicio} class="mt-0 w-full min-w-0" />
-          <span class="shrink-0 text-slate-500">–</span>
-          <input type="date" name="prazo_fim" value={prazoFim} class="mt-0 w-full min-w-0" />
-        </div>
-      </div>
-      <div>
-        <label>Data Pagamento Realizado</label>
-        <div class="mt-1 flex items-center gap-2">
-          <input type="date" name="data_pagamento_inicio" value={dataPagamentoInicio} class="mt-0 w-full min-w-0" />
-          <span class="shrink-0 text-slate-500">–</span>
-          <input type="date" name="data_pagamento_fim" value={dataPagamentoFim} class="mt-0 w-full min-w-0" />
-        </div>
-      </div>
-    </div>
 
-    <div class="flex gap-3">
-      <button type="submit" class="btn-primary">Filtrar</button>
-      <a href="/pedidos" class="btn-secondary">Limpar filtros</a>
-    </div>
-  </form>
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a href="/pedidos" class="btn-secondary">Limpar filtros</a>
+      </div>
+    </form>
+  </FiltrosCard>
 
   <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
     <KpiCard label="Pedidos (filtro atual)" value={String(totalPedidos)} />
