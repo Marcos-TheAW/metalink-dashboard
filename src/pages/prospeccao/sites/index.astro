@@ -3,7 +3,7 @@ import Layout from '../../../layouts/Layout.astro';
 import BotaoExcluir from '../../../components/BotaoExcluir.astro';
 import KpiCard from '../../../components/KpiCard.astro';
 import StatusBadge from '../../../components/StatusBadge.astro';
-import { listSitesProspectados } from '../../../lib/db';
+import { listSemanasSitesProspectados, listSitesProspectados } from '../../../lib/db';
 import {
   CANAIS_PROSPECCAO,
   STATUS_PROSPECCAO,
@@ -19,12 +19,21 @@ const url = Astro.url;
 const status = url.searchParams.get('status') ?? '';
 const canal = url.searchParams.get('canal') ?? '';
 const nicho = url.searchParams.get('nicho') ?? '';
+const semana = url.searchParams.get('semana') ?? '';
+const registroInicio = url.searchParams.get('registro_inicio') ?? '';
+const registroFim = url.searchParams.get('registro_fim') ?? '';
 
-const sites = await listSitesProspectados({
-  status: status || undefined,
-  canal: canal || undefined,
-  nicho: nicho || undefined
-});
+const [sites, semanas] = await Promise.all([
+  listSitesProspectados({
+    status: status || undefined,
+    canal: canal || undefined,
+    nicho: nicho || undefined,
+    semana: semana || undefined,
+    registroInicio: registroInicio || undefined,
+    registroFim: registroFim || undefined
+  }),
+  listSemanasSitesProspectados()
+]);
 
 const totalSites = sites.length;
 const totalFechados = sites.filter((s) => s.status === 'fechado').length;
@@ -41,6 +50,21 @@ const taxaResposta = totalSites > 0 ? respondentes / totalSites : null;
 
   <form method="get" class="card mb-6 flex flex-col gap-4">
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div>
+        <label for="semana">Semana (segunda)</label>
+        <select id="semana" name="semana">
+          <option value="">Todas</option>
+          {semanas.map((s) => <option value={s} selected={s === semana}>{formatarDataBR(s)}</option>)}
+        </select>
+      </div>
+      <div class="sm:col-span-2">
+        <label>Data do Registro</label>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="date" name="registro_inicio" value={registroInicio} class="mt-0 w-full min-w-0" />
+          <span class="shrink-0 text-slate-500">–</span>
+          <input type="date" name="registro_fim" value={registroFim} class="mt-0 w-full min-w-0" />
+        </div>
+      </div>
       <div>
         <label for="status">Status</label>
         <select id="status" name="status">
@@ -84,6 +108,7 @@ const taxaResposta = totalSites > 0 ? respondentes / totalSites : null;
           <th>Canal</th>
           <th>Tentativas</th>
           <th>Status</th>
+          <th>Data do Registro</th>
           <th>Ações</th>
         </tr>
       </thead>
@@ -104,21 +129,35 @@ const taxaResposta = totalSites > 0 ? respondentes / totalSites : null;
               <td>
                 <StatusBadge value={s.status} label={labelFor(STATUS_PROSPECCAO, s.status)} />
               </td>
-              <td class="whitespace-nowrap">
-                <a href={`/prospeccao/sites/${s.id}`} class="text-brand-600 hover:underline text-sm">Editar</a>
-                <span class="mx-1.5 text-slate-300">·</span>
-                <BotaoExcluir
-                  action={`/api/prospeccao/sites/${s.id}/excluir`}
-                  mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o site ${s.url_site}? Todos os dados desse registro serão perdidos permanentemente.`}
-                  compacto
-                />
+              <td>{formatarDataBR(s.criado_em)}</td>
+              <td class="overflow-visible">
+                <details class="relative">
+                  <summary
+                    class="cursor-pointer list-none rounded px-1.5 py-0.5 leading-none text-slate-400 hover:bg-slate-200 hover:text-white [&::-webkit-details-marker]:hidden"
+                    aria-label="Ações do site"
+                  >
+                    ⋮
+                  </summary>
+                  <div class="absolute right-0 z-10 mt-1 w-36 rounded-md border border-slate-300 bg-slate-100 py-1 shadow-lg">
+                    <a href={`/prospeccao/sites/${s.id}`} class="block px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-200 hover:text-white">
+                      Editar
+                    </a>
+                    <div class="px-3 py-1.5">
+                      <BotaoExcluir
+                        action={`/api/prospeccao/sites/${s.id}/excluir`}
+                        mensagemConfirmacao={`Atenção: esta ação é irreversível. Tem certeza que deseja excluir o site ${s.url_site}? Todos os dados desse registro serão perdidos permanentemente.`}
+                        compacto
+                      />
+                    </div>
+                  </div>
+                </details>
               </td>
             </tr>
           ))
         }
         {sites.length === 0 && (
           <tr>
-            <td colspan="8" class="text-center text-slate-400">Nenhum site prospectado encontrado para esses filtros.</td>
+            <td colspan="9" class="text-center text-slate-400">Nenhum site prospectado encontrado para esses filtros.</td>
           </tr>
         )}
       </tbody>

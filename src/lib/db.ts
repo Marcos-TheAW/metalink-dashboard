@@ -147,6 +147,27 @@ export async function atualizarCliente(
   );
 }
 
+export interface DependenciasCliente {
+  pedidos: number;
+  acoes: number;
+}
+
+export async function contarDependenciasCliente(id: number): Promise<DependenciasCliente> {
+  const row = await db()
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM pedidos WHERE cliente_id = ?) AS pedidos,
+         (SELECT COUNT(*) FROM acoes_comerciais WHERE cliente_id = ?) AS acoes`
+    )
+    .bind(id, id)
+    .first<DependenciasCliente>();
+  return row ?? { pedidos: 0, acoes: 0 };
+}
+
+export async function deletarCliente(id: number): Promise<void> {
+  await db().prepare('DELETE FROM clientes WHERE id = ?').bind(id).run();
+}
+
 export async function listClientesStatus(): Promise<ClienteStatus[]> {
   const { results } = await db()
     .prepare('SELECT * FROM v_clientes_status ORDER BY nome')
@@ -709,6 +730,9 @@ export interface FiltrosSitesProspectados {
   status?: string;
   canal?: string;
   nicho?: string;
+  semana?: string;
+  registroInicio?: string;
+  registroFim?: string;
 }
 
 export async function listSitesProspectados(filtros: FiltrosSitesProspectados = {}): Promise<SiteProspectado[]> {
@@ -726,12 +750,35 @@ export async function listSitesProspectados(filtros: FiltrosSitesProspectados = 
     clauses.push('nicho LIKE ?');
     params.push(`%${filtros.nicho}%`);
   }
+  if (filtros.semana) {
+    clauses.push('data_contato = ?');
+    params.push(filtros.semana);
+  }
+  if (filtros.registroInicio) {
+    clauses.push('date(criado_em) >= ?');
+    params.push(filtros.registroInicio);
+  }
+  if (filtros.registroFim) {
+    clauses.push('date(criado_em) <= ?');
+    params.push(filtros.registroFim);
+  }
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const { results } = await db()
     .prepare(`SELECT * FROM sites_prospectados ${where} ORDER BY data_contato DESC, id DESC`)
     .bind(...params)
     .all<SiteProspectado>();
   return results;
+}
+
+export async function listSemanasSitesProspectados(): Promise<string[]> {
+  const { results } = await db()
+    .prepare(
+      `SELECT DISTINCT data_contato AS semana
+       FROM sites_prospectados
+       ORDER BY semana DESC`
+    )
+    .all<{ semana: string }>();
+  return results.map((r) => r.semana);
 }
 
 export async function getSiteProspectado(id: number): Promise<SiteProspectado | null> {
