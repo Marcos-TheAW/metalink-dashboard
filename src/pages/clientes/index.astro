@@ -28,6 +28,27 @@ const clientes = await listClientesStatus();
         <label for="observacao">Observação</label>
         <input type="text" id="observacao" name="observacao" />
       </div>
+      <div>
+        <label for="cnpj_cpf">CNPJ/CPF <span class="text-slate-400">(opcional)</span></label>
+        <input type="text" id="cnpj_cpf" name="cnpj_cpf" />
+      </div>
+      <div>
+        <label for="telefone_whatsapp">Telefone WhatsApp <span class="text-slate-400">(opcional)</span></label>
+        <input type="text" id="telefone_whatsapp" name="telefone_whatsapp" />
+      </div>
+      <div>
+        <label for="email">E-mail <span class="text-slate-400">(opcional)</span></label>
+        <input type="email" id="email" name="email" />
+      </div>
+      <div>
+        <label for="endereco">Endereço <span class="text-slate-400">(opcional)</span></label>
+        <input type="text" id="endereco" name="endereco" />
+      </div>
+      <p class="text-xs text-slate-500 sm:col-span-2">
+        Só o nome é obrigatório. Os demais campos alimentam a sugestão automática em
+        <a href="/faturas/gringos" class="underline">Criação de Invoice para Clientes Gringos</a> — o CNPJ/CPF é o que
+        preenche o VAT ID da invoice.
+      </p>
       <div class="sm:col-span-2">
         <button type="submit" class="btn-primary">Cadastrar cliente</button>
       </div>
@@ -62,7 +83,7 @@ const clientes = await listClientesStatus();
                     >
                       ⋮
                     </summary>
-                    <div class="absolute left-0 z-10 mt-1 w-64 rounded-md border border-slate-300 bg-slate-100 p-3 shadow-lg">
+                    <div class="absolute left-0 z-10 mt-1 w-72 rounded-md border border-slate-300 bg-slate-100 p-3 shadow-lg">
                       <form method="post" action={`/api/clientes/${c.id}`} class="flex flex-col gap-2">
                         <div>
                           <label for={`nome-${c.id}`}>Nome do cliente</label>
@@ -71,6 +92,27 @@ const clientes = await listClientesStatus();
                         <div>
                           <label for={`observacao-${c.id}`}>Observação</label>
                           <input type="text" id={`observacao-${c.id}`} name="observacao" value={c.observacao ?? ''} />
+                        </div>
+                        <div>
+                          <label for={`cnpj_cpf-${c.id}`}>CNPJ/CPF</label>
+                          <input type="text" id={`cnpj_cpf-${c.id}`} name="cnpj_cpf" value={c.cnpj_cpf ?? ''} />
+                        </div>
+                        <div>
+                          <label for={`telefone_whatsapp-${c.id}`}>Telefone WhatsApp</label>
+                          <input
+                            type="text"
+                            id={`telefone_whatsapp-${c.id}`}
+                            name="telefone_whatsapp"
+                            value={c.telefone_whatsapp ?? ''}
+                          />
+                        </div>
+                        <div>
+                          <label for={`email-${c.id}`}>E-mail</label>
+                          <input type="email" id={`email-${c.id}`} name="email" value={c.email ?? ''} />
+                        </div>
+                        <div>
+                          <label for={`endereco-${c.id}`}>Endereço</label>
+                          <input type="text" id={`endereco-${c.id}`} name="endereco" value={c.endereco ?? ''} />
                         </div>
                         <button type="submit" class="btn-primary mt-1">
                           Salvar

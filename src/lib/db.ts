@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import type {
   AcaoComercial,
   Cliente,
+  ClienteContato,
   ClienteStatus,
   KpisGerais,
   Papel,
@@ -119,31 +120,41 @@ export async function getCliente(id: number): Promise<Cliente | null> {
   return row ?? null;
 }
 
-export async function criarCliente(nome: string, observacao: string | null): Promise<number> {
+export interface ClienteInput extends ClienteContato {
+  nome: string;
+  observacao: string | null;
+}
+
+export async function criarCliente(input: ClienteInput): Promise<number> {
   const result = await db()
-    .prepare('INSERT INTO clientes (nome, observacao) VALUES (?, ?)')
-    .bind(nome, observacao)
+    .prepare(
+      `INSERT INTO clientes (nome, observacao, cnpj_cpf, telefone_whatsapp, endereco, email)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(input.nome, input.observacao, input.cnpj_cpf, input.telefone_whatsapp, input.endereco, input.email)
     .run();
   return result.meta.last_row_id as number;
 }
 
-export async function atualizarCliente(
-  id: number,
-  nome: string,
-  observacao: string | null,
-  usuarioId: number
-): Promise<void> {
+export async function atualizarCliente(id: number, input: ClienteInput, usuarioId: number): Promise<void> {
   const atual = await getCliente(id);
   if (!atual) throw new Error('Cliente não encontrado');
 
-  await db().prepare('UPDATE clientes SET nome = ?, observacao = ? WHERE id = ?').bind(nome, observacao, id).run();
+  await db()
+    .prepare(
+      `UPDATE clientes
+          SET nome = ?, observacao = ?, cnpj_cpf = ?, telefone_whatsapp = ?, endereco = ?, email = ?
+        WHERE id = ?`
+    )
+    .bind(input.nome, input.observacao, input.cnpj_cpf, input.telefone_whatsapp, input.endereco, input.email, id)
+    .run();
 
   await registrarHistorico(
     'clientes',
     id,
     usuarioId,
     atual as unknown as Record<string, unknown>,
-    { nome, observacao } as unknown as Record<string, unknown>
+    input as unknown as Record<string, unknown>
   );
 }
 

@@ -1,7 +1,26 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import { listClientes } from '../../lib/db';
+import { temAcessoArea } from '../../lib/types';
 
 const usuario = Astro.locals.usuario;
+
+// Primeira leitura de D1 desta página, que antes era 100% stateless: serve só para
+// sugerir os campos de "Billed To" a partir do cadastro de clientes. A página não tem
+// gate de área (qualquer usuário autenticado abre), mas o cadastro de clientes pertence
+// à área Comercial — então a lista só é embutida para quem também abriria /clientes.
+// Sem ela o campo de nome continua funcionando normalmente, como texto livre.
+const clientes = temAcessoArea(usuario, 'comercial') ? await listClientes() : [];
+const sugestoes = clientes.map((c) => ({
+  nome: c.nome,
+  cnpj_cpf: c.cnpj_cpf,
+  endereco: c.endereco,
+  email: c.email,
+  telefone_whatsapp: c.telefone_whatsapp
+}));
+// Escapa `<` para que um nome de cliente contendo "</script>" não feche a tag e escape
+// do bloco JSON (os nomes vêm do cadastro, ou seja, são texto digitado por usuário).
+const sugestoesJson = JSON.stringify(sugestoes).replace(/</g, '\\u003c');
 ---
 
 <Layout title="Criação de Invoice para Clientes Gringos" usuario={usuario}>
@@ -16,7 +35,23 @@ const usuario = Astro.locals.usuario;
     <form id="invoice-form" class="mt-6 flex flex-col gap-6" novalidate>
       <div>
         <label for="cliente_nome">Nome do cliente</label>
-        <input type="text" id="cliente_nome" name="cliente_nome" required placeholder="Ex: MotherLink" />
+        <input
+          type="text"
+          id="cliente_nome"
+          name="cliente_nome"
+          required
+          placeholder="Ex: MotherLink"
+          list="lista-clientes"
+          autocomplete="off"
+        />
+        <datalist id="lista-clientes">
+          {sugestoes.map((c) => <option value={c.nome} />)}
+        </datalist>
+        <p class="mt-1 text-xs text-slate-500">
+          Campo livre — digite qualquer nome. Ao digitar, os clientes já cadastrados aparecem como sugestão; escolher um
+          deles preenche o que estiver em branco em "Billed To".
+        </p>
+        <p id="cliente-hint" class="mt-1 hidden text-xs text-brand-500"></p>
       </div>
 
       <fieldset class="rounded-md border border-slate-300 p-4">
@@ -109,6 +144,8 @@ const usuario = Astro.locals.usuario;
       </div>
     </form>
   </section>
+
+  <script id="clientes-sugeridos" type="application/json" is:inline set:html={sugestoesJson} />
 
   <template id="servico-row-template">
     <tr class="servico-row">
@@ -434,6 +471,96 @@ const usuario = Astro.locals.usuario;
   const formSection = document.getElementById('form-section') as HTMLElement;
   const invoiceSection = document.getElementById('invoice-section') as HTMLElement;
 
+  // ----- Sugestão a partir do cadastro de clientes -----
+
+  interface ClienteSugerido {
+    nome: string;
+    cnpj_cpf: string | null;
+    endereco: string | null;
+    email: string | null;
+    telefone_whatsapp: string | null;
+  }
+
+  const inputClienteNome = document.getElementById('cliente_nome') as HTMLInputElement;
+  const clienteHint = document.getElementById('cliente-hint') as HTMLElement;
+  const dadosClientes = document.getElementById('clientes-sugeridos');
+  const clientesPorNome = new Map<string, ClienteSugerido>(
+    (JSON.parse(dadosClientes?.textContent?.trim() || '[]') as ClienteSugerido[]).map((c) => [
+      c.nome.trim().toLowerCase(),
+      c
+    ])
+  );
+
+  // Campo da invoice <- campo do cadastro. `cnpj_cpf` alimenta o VAT ID de propósito: é o
+  // mesmo dado com nome diferente nos dois lados (documento fiscal brasileiro no cadastro,
+  // VAT ID no documento internacional). `endereco` é um campo único no cadastro, então cai
+  // inteiro em "Bairro, cidade e país" — quebrar em complemento exigiria adivinhar onde
+  // cortar, e quem gera a invoice ajusta em 2 segundos. `register_code` não tem
+  // equivalente no cadastro e continua 100% manual.
+  const CAMPOS_SUGERIDOS: { id: string; valor: (c: ClienteSugerido) => string | null }[] = [
+    { id: 'billed_linha1', valor: (c) => c.nome },
+    { id: 'vat_id', valor: (c) => c.cnpj_cpf },
+    { id: 'billed_cidade_pais', valor: (c) => c.endereco }
+  ];
+
+  function campoSugerido(id: string): HTMLInputElement | null {
+    return document.getElementById(id) as HTMLInputElement | null;
+  }
+
+  function aplicarSugestao(cliente: ClienteSugerido): void {
+    for (const { id, valor } of CAMPOS_SUGERIDOS) {
+      const el = campoSugerido(id);
+      if (!el) continue;
+      // Só preenche o que está vazio ou o que uma sugestão anterior preencheu — trocar de
+      // cliente corrige a sugestão antiga, mas nada digitado à mão é sobrescrito.
+      if (el.value.trim() !== '' && el.dataset.sugerido !== 'true') continue;
+      const novo = (valor(cliente) ?? '').trim();
+      if (!novo) continue;
+      el.value = novo;
+      el.dataset.sugerido = 'true';
+    }
+  }
+
+  // E-mail e WhatsApp não têm campo na invoice (o modelo só traz o e-mail do remetente,
+  // que é fixo) — aparecem aqui como referência para quem vai enviar o documento.
+  function atualizarHintCliente(cliente: ClienteSugerido | null): void {
+    if (!cliente) {
+      clienteHint.textContent = '';
+      clienteHint.classList.add('hidden');
+      return;
+    }
+    const contatos: string[] = [];
+    if (cliente.email) contatos.push(`e-mail ${cliente.email}`);
+    if (cliente.telefone_whatsapp) contatos.push(`WhatsApp ${cliente.telefone_whatsapp}`);
+    clienteHint.textContent =
+      `Sugerido do cadastro de ${cliente.nome}` + (contatos.length ? ` · ${contatos.join(' · ')}` : '');
+    clienteHint.classList.remove('hidden');
+  }
+
+  function limparSugestoes(): void {
+    CAMPOS_SUGERIDOS.forEach(({ id }) => delete campoSugerido(id)?.dataset.sugerido);
+    atualizarHintCliente(null);
+  }
+
+  CAMPOS_SUGERIDOS.forEach(({ id }) => {
+    // Digitar no campo tira dele a marca de "preenchido por sugestão", protegendo o valor
+    // manual de ser trocado se outro cliente for escolhido depois.
+    campoSugerido(id)?.addEventListener('input', (e) => {
+      delete (e.currentTarget as HTMLInputElement).dataset.sugerido;
+    });
+  });
+
+  inputClienteNome.addEventListener('input', () => {
+    // Casa por nome exato (sem caixa/espaços): é o que acontece ao escolher um item da
+    // datalist, e também ao digitar o nome inteiro à mão. Nome que não casa com nenhum
+    // cadastro simplesmente não sugere nada — o campo segue livre.
+    const cliente = clientesPorNome.get(inputClienteNome.value.trim().toLowerCase());
+    if (!cliente) return;
+    aplicarSugestao(cliente);
+    atualizarHintCliente(cliente);
+    validarFormulario();
+  });
+
   function formatNumero(valor: number): string {
     return Number.isInteger(valor) ? String(valor) : valor.toFixed(2);
   }
@@ -574,6 +701,7 @@ const usuario = Astro.locals.usuario;
 
   function resetarFormulario(): void {
     form.reset();
+    limparSugestoes();
     servicosBody.innerHTML = '';
     addRow();
     recalcularTotal();

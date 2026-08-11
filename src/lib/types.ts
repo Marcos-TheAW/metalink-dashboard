@@ -165,14 +165,23 @@ export interface UsuarioCredenciais extends Usuario {
   bloqueado_ate: string | null;
 }
 
-export interface Cliente {
+// Os quatro campos de contato/faturamento (migration 0012) sao sempre opcionais —
+// `null` tanto nos clientes antigos quanto num cadastro novo que so informou o nome.
+export interface ClienteContato {
+  cnpj_cpf: string | null;
+  telefone_whatsapp: string | null;
+  endereco: string | null;
+  email: string | null;
+}
+
+export interface Cliente extends ClienteContato {
   id: number;
   nome: string;
   observacao: string | null;
   criado_em: string;
 }
 
-export interface ClienteStatus {
+export interface ClienteStatus extends ClienteContato {
   id: number;
   nome: string;
   observacao: string | null;

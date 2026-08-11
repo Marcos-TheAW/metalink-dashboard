@@ -124,9 +124,17 @@ functions rather than writing raw SQL inline.
 per changed field, old/new value as text). This happens inside `atualizarPedido`/`atualizarAcao`/
 `atualizarCliente` in `src/lib/db.ts` via the private `registrarHistorico` diff helper — it compares the
 fetched "before" row against the submitted input field-by-field and only inserts rows for fields that
-actually changed. `clientes` editing is nome/observacao only, triggered from a small `<details>` popover
-next to the name on `/clientes` (no dedicated detail page, no historico *display* anywhere yet — the
-rows are recorded but nothing reads them back for clientes today).
+actually changed. `clientes` editing covers nome/observacao plus the four contato/faturamento fields
+(`cnpj_cpf`, `telefone_whatsapp`, `endereco`, `email` — migration `0012`), triggered from a small
+`<details>` popover next to the name on `/clientes` (no dedicated detail page, no historico *display*
+anywhere yet — the rows are recorded but nothing reads them back for clientes today). Those four are
+always nullable and never required by either form: they exist to prefill the invoice generator (see
+below), pre-0012 rows keep them `NULL` until someone fills them in by hand, and
+`criarCliente`/`atualizarCliente` take a single `ClienteInput` object rather than positional args so
+adding another field doesn't grow the signature. `v_clientes_status` lists `clientes` columns explicitly
+rather than `c.*`, so a new column on that table needs the view recreated (`DROP VIEW` + `CREATE VIEW` in
+the same migration) or `/clientes` can't render it — `v_kpis_gerais` references that view by name and
+resolves per query, so it doesn't need recreating alongside.
 
 ### Request flow: plain HTML forms → API routes → redirect
 
@@ -267,11 +275,29 @@ them, only edit.
 
 `src/pages/faturas/gringos.astro` (nav: "Faturas" dropdown, no area gate — same `null`
 `areaDaRota()` bucket as `/minha-conta`, so any authenticated user can open it) is a deliberate
-exception to "plain HTML forms, no client JS": it's a stateless invoice generator (no D1 read/write
-at all), and the spec requires dynamic add/remove rows, a live running total, and instant
-render-without-reload, none of which fit the redirect-with-`?erro=` form pattern. All logic
-(row add/remove, live total, required-field validation gating the "Gerar Invoice" button, building
-the invoice preview DOM, `window.print()` for PDF export) lives in one `<script>` tag in that file.
+exception to "plain HTML forms, no client JS": the invoice itself is never persisted (no D1 *write*,
+no invoice table — it's generated, printed, and gone), and the spec requires dynamic add/remove rows,
+a live running total, and instant render-without-reload, none of which fit the redirect-with-`?erro=`
+form pattern. All logic (row add/remove, live total, required-field validation gating the "Gerar
+Invoice" button, building the invoice preview DOM, `window.print()` for PDF export) lives in one
+`<script>` tag in that file.
+
+Its one D1 *read* is the client-suggestion list: frontmatter calls `listClientes()` and embeds it as a
+`<script type="application/json" id="clientes-sugeridos">` block (every `<` rewritten as its unicode
+escape, since client names are user-entered and one containing a closing script tag would otherwise
+break out of the block), which
+the module script parses into a name→cliente map. "Nome do cliente" stays free text — the suggestions
+are a native `<datalist>`, not a closed `<select>`, deliberately: invoices go to names that may not be
+in the cadastro at all. Typing a name that exactly matches a cadastro entry (case/whitespace-insensitive,
+which is what picking from the datalist produces) prefills `billed_linha1`←`nome`, `vat_id`←`cnpj_cpf`,
+`billed_cidade_pais`←`endereco`. `cnpj_cpf` → "VAT ID" is intentional, not a mismatch: same datum, named
+for the Brazilian cadastro on one side and the international document on the other. Prefill only touches
+fields that are empty **or** carry `data-sugerido="true"` from an earlier suggestion — typing in a field
+clears that flag, so manual input is never overwritten when a different client is picked afterwards.
+`email`/`telefone_whatsapp` have no invoice field (the document's only e-mail is the fixed sender's) and
+surface as a hint line under the name input instead. The page has no area gate, but the cadastro belongs
+to Comercial, so the list is only embedded when `temAcessoArea(usuario, 'comercial')` — otherwise it's
+`[]` and the field simply never suggests.
 
 The invoice preview's `<style>` block is `is:global` **on purpose**, not an oversight: the service-row
 `<tr>`/`<td>` elements are built via `document.createElement` at generate-time, so they never get the
