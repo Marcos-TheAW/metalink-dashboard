@@ -219,10 +219,12 @@ export interface KpiPorMes {
 export async function getKpisPorMes(): Promise<KpiPorMes[]> {
   const { results } = await db()
     .prepare(
-      // O mês de um pedido é o mês da segunda-feira da sua semana (não o dia exato do
-      // pedido) — assim uma semana que atravessa a virada do mês fica inteira num só mês,
-      // em vez de picotada entre os dois.
-      `SELECT strftime('%Y-%m', date(data_pedido, '-' || ((CAST(strftime('%w', data_pedido) AS INTEGER) + 6) % 7) || ' days')) AS mes,
+      // Mês-calendário da `data_pedido`, não o mês da segunda-feira da semana do pedido:
+      // uma semana que atravessa a virada do mês fica dividida entre os dois meses, de
+      // propósito. É o preço de a linha do mês bater exatamente com o filtro de datas de
+      // /pedidos (que compara `data_pedido` cru) e com o KPI de receita total — ter duas
+      // definições de "julho" no mesmo dashboard gerava divergência a cada fechamento.
+      `SELECT strftime('%Y-%m', data_pedido) AS mes,
               COUNT(*) AS total_pedidos,
               COALESCE(SUM(qtd_links), 0) AS total_links,
               COALESCE(SUM(valor_centavos), 0) AS receita_centavos,
