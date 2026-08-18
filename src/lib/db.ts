@@ -179,9 +179,100 @@ export async function deletarCliente(id: number): Promise<void> {
   await db().prepare('DELETE FROM clientes WHERE id = ?').bind(id).run();
 }
 
-export async function listClientesStatus(): Promise<ClienteStatus[]> {
+export interface FiltrosClientes {
+  clienteIds?: number[];
+  status?: string[];
+  ultimoPedidoInicio?: string;
+  ultimoPedidoFim?: string;
+  diasSemPedidoMin?: number;
+  diasSemPedidoMax?: number;
+  ultimoContatoInicio?: string;
+  ultimoContatoFim?: string;
+  diasSemContatoMin?: number;
+  diasSemContatoMax?: number;
+  totalPedidosMin?: number;
+  totalPedidosMax?: number;
+  receitaMinCentavos?: number;
+  receitaMaxCentavos?: number;
+  keyAccount?: boolean;
+}
+
+export async function listClientesStatus(filtros: FiltrosClientes = {}): Promise<ClienteStatus[]> {
+  // Mesmo esquema de clauses/params de listPedidos, mas direto sobre a view:
+  // dias_sem_pedido / dias_sem_contato / status_relacionamento / key_account já
+  // vêm resolvidos como colunas de v_clientes_status, então dá pra filtrar por
+  // eles no WHERE sem CTE intermediária.
+  //
+  // Cliente sem pedido tem ultimo_pedido/dias_sem_pedido NULL (idem contato), e
+  // NULL nunca satisfaz >= / <=: filtrar por qualquer faixa dessas colunas
+  // exclui esses clientes de propósito — quem quer vê-los filtra por
+  // Status = "Nunca Comprou".
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (filtros.clienteIds && filtros.clienteIds.length > 0) {
+    clauses.push(`id IN (${filtros.clienteIds.map(() => '?').join(',')})`);
+    params.push(...filtros.clienteIds);
+  }
+  if (filtros.status && filtros.status.length > 0) {
+    clauses.push(`status_relacionamento IN (${filtros.status.map(() => '?').join(',')})`);
+    params.push(...filtros.status);
+  }
+  if (filtros.ultimoPedidoInicio) {
+    clauses.push('ultimo_pedido >= ?');
+    params.push(filtros.ultimoPedidoInicio);
+  }
+  if (filtros.ultimoPedidoFim) {
+    clauses.push('ultimo_pedido <= ?');
+    params.push(filtros.ultimoPedidoFim);
+  }
+  if (filtros.diasSemPedidoMin !== undefined) {
+    clauses.push('dias_sem_pedido >= ?');
+    params.push(filtros.diasSemPedidoMin);
+  }
+  if (filtros.diasSemPedidoMax !== undefined) {
+    clauses.push('dias_sem_pedido <= ?');
+    params.push(filtros.diasSemPedidoMax);
+  }
+  if (filtros.ultimoContatoInicio) {
+    clauses.push('ultimo_contato >= ?');
+    params.push(filtros.ultimoContatoInicio);
+  }
+  if (filtros.ultimoContatoFim) {
+    clauses.push('ultimo_contato <= ?');
+    params.push(filtros.ultimoContatoFim);
+  }
+  if (filtros.diasSemContatoMin !== undefined) {
+    clauses.push('dias_sem_contato >= ?');
+    params.push(filtros.diasSemContatoMin);
+  }
+  if (filtros.diasSemContatoMax !== undefined) {
+    clauses.push('dias_sem_contato <= ?');
+    params.push(filtros.diasSemContatoMax);
+  }
+  if (filtros.totalPedidosMin !== undefined) {
+    clauses.push('total_pedidos >= ?');
+    params.push(filtros.totalPedidosMin);
+  }
+  if (filtros.totalPedidosMax !== undefined) {
+    clauses.push('total_pedidos <= ?');
+    params.push(filtros.totalPedidosMax);
+  }
+  if (filtros.receitaMinCentavos !== undefined) {
+    clauses.push('receita_total_centavos >= ?');
+    params.push(filtros.receitaMinCentavos);
+  }
+  if (filtros.receitaMaxCentavos !== undefined) {
+    clauses.push('receita_total_centavos <= ?');
+    params.push(filtros.receitaMaxCentavos);
+  }
+  if (filtros.keyAccount !== undefined) {
+    clauses.push('key_account = ?');
+    params.push(filtros.keyAccount ? 1 : 0);
+  }
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const { results } = await db()
-    .prepare('SELECT * FROM v_clientes_status ORDER BY nome')
+    .prepare(`SELECT * FROM v_clientes_status ${where} ORDER BY nome`)
+    .bind(...params)
     .all<ClienteStatus>();
   return results;
 }

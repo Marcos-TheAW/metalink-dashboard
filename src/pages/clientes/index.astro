@@ -2,14 +2,85 @@
 import Layout from '../../layouts/Layout.astro';
 import BotaoExcluir from '../../components/BotaoExcluir.astro';
 import ErrorBanner from '../../components/ErrorBanner.astro';
+import FiltroMulti from '../../components/FiltroMulti.astro';
+import FiltrosCard from '../../components/FiltrosCard.astro';
 import StatusBadge from '../../components/StatusBadge.astro';
-import { listClientesStatus } from '../../lib/db';
+import { listClientes, listClientesStatus } from '../../lib/db';
 import { STATUS_RELACIONAMENTO_LABEL, centavosParaReais, type StatusRelacionamento } from '../../lib/types';
 
 const usuario = Astro.locals.usuario;
-const erro = Astro.url.searchParams.get('erro');
+const url = Astro.url;
+const erro = url.searchParams.get('erro');
 
-const clientes = await listClientesStatus();
+// Cliente e Status aceitam vários valores (getAll): o filtro é "um dos
+// selecionados", não "todos ao mesmo tempo" — ver FiltroMulti.astro.
+const clientesSelecionados = url.searchParams.getAll('cliente_id');
+const statusSelecionados = url.searchParams.getAll('status');
+
+function paraNumero(valor: string | null): number | undefined {
+  if (!valor) return undefined;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+const ultimoPedidoInicio = url.searchParams.get('ultimo_pedido_inicio') ?? '';
+const ultimoPedidoFim = url.searchParams.get('ultimo_pedido_fim') ?? '';
+const diasSemPedidoMin = paraNumero(url.searchParams.get('dias_sem_pedido_min'));
+const diasSemPedidoMax = paraNumero(url.searchParams.get('dias_sem_pedido_max'));
+const ultimoContatoInicio = url.searchParams.get('ultimo_contato_inicio') ?? '';
+const ultimoContatoFim = url.searchParams.get('ultimo_contato_fim') ?? '';
+const diasSemContatoMin = paraNumero(url.searchParams.get('dias_sem_contato_min'));
+const diasSemContatoMax = paraNumero(url.searchParams.get('dias_sem_contato_max'));
+const totalPedidosMin = paraNumero(url.searchParams.get('total_pedidos_min'));
+const totalPedidosMax = paraNumero(url.searchParams.get('total_pedidos_max'));
+const receitaMinTexto = url.searchParams.get('receita_min') ?? '';
+const receitaMaxTexto = url.searchParams.get('receita_max') ?? '';
+const receitaMinCentavos = receitaMinTexto ? Math.round(Number(receitaMinTexto) * 100) : undefined;
+const receitaMaxCentavos = receitaMaxTexto ? Math.round(Number(receitaMaxTexto) * 100) : undefined;
+const keyAccountTexto = url.searchParams.get('key_account') ?? '';
+
+const [clientes, opcoesClientes] = await Promise.all([
+  listClientesStatus({
+    clienteIds: clientesSelecionados.map(Number).filter(Number.isFinite),
+    status: statusSelecionados.length > 0 ? statusSelecionados : undefined,
+    ultimoPedidoInicio: ultimoPedidoInicio || undefined,
+    ultimoPedidoFim: ultimoPedidoFim || undefined,
+    diasSemPedidoMin,
+    diasSemPedidoMax,
+    ultimoContatoInicio: ultimoContatoInicio || undefined,
+    ultimoContatoFim: ultimoContatoFim || undefined,
+    diasSemContatoMin,
+    diasSemContatoMax,
+    totalPedidosMin,
+    totalPedidosMax,
+    receitaMinCentavos:
+      receitaMinCentavos !== undefined && Number.isFinite(receitaMinCentavos) ? receitaMinCentavos : undefined,
+    receitaMaxCentavos:
+      receitaMaxCentavos !== undefined && Number.isFinite(receitaMaxCentavos) ? receitaMaxCentavos : undefined,
+    keyAccount: keyAccountTexto === '' ? undefined : keyAccountTexto === '1'
+  }),
+  listClientes()
+]);
+
+const opcoesStatus = Object.entries(STATUS_RELACIONAMENTO_LABEL).map(([value, label]) => ({ value, label }));
+
+const filtrosAtivos = [
+  clientesSelecionados.length > 0,
+  statusSelecionados.length > 0,
+  ultimoPedidoInicio,
+  ultimoPedidoFim,
+  diasSemPedidoMin !== undefined,
+  diasSemPedidoMax !== undefined,
+  ultimoContatoInicio,
+  ultimoContatoFim,
+  diasSemContatoMin !== undefined,
+  diasSemContatoMax !== undefined,
+  totalPedidosMin !== undefined,
+  totalPedidosMax !== undefined,
+  receitaMinTexto,
+  receitaMaxTexto,
+  keyAccountTexto
+].filter(Boolean).length;
 ---
 
 <Layout title="Clientes" usuario={usuario}>
@@ -54,6 +125,143 @@ const clientes = await listClientesStatus();
       </div>
     </form>
   </details>
+
+  <FiltrosCard ativos={filtrosAtivos}>
+    <form method="get" class="flex flex-col gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <FiltroMulti
+          name="cliente_id"
+          label="Cliente"
+          buscavel
+          options={opcoesClientes.map((c) => ({ value: String(c.id), label: c.nome }))}
+          selecionados={clientesSelecionados}
+        />
+        <FiltroMulti name="status" label="Status" options={opcoesStatus} selecionados={statusSelecionados} />
+        <div>
+          <label for="key_account">Key Account</label>
+          <select id="key_account" name="key_account">
+            <option value="" selected={keyAccountTexto === ''}>Todos</option>
+            <option value="1" selected={keyAccountTexto === '1'}>Somente Key Account</option>
+            <option value="0" selected={keyAccountTexto === '0'}>Sem Key Account</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label>Último Pedido</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input type="date" name="ultimo_pedido_inicio" value={ultimoPedidoInicio} class="mt-0 w-full min-w-0" />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input type="date" name="ultimo_pedido_fim" value={ultimoPedidoFim} class="mt-0 w-full min-w-0" />
+          </div>
+        </div>
+        <div>
+          <label>Dias s/ Pedido</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input
+              type="number"
+              name="dias_sem_pedido_min"
+              min="0"
+              placeholder="De"
+              value={diasSemPedidoMin ?? ''}
+              class="mt-0 w-full min-w-0"
+            />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input
+              type="number"
+              name="dias_sem_pedido_max"
+              min="0"
+              placeholder="Até"
+              value={diasSemPedidoMax ?? ''}
+              class="mt-0 w-full min-w-0"
+            />
+          </div>
+        </div>
+        <div>
+          <label>Último Contato</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input type="date" name="ultimo_contato_inicio" value={ultimoContatoInicio} class="mt-0 w-full min-w-0" />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input type="date" name="ultimo_contato_fim" value={ultimoContatoFim} class="mt-0 w-full min-w-0" />
+          </div>
+        </div>
+        <div>
+          <label>Dias s/ Contato</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input
+              type="number"
+              name="dias_sem_contato_min"
+              min="0"
+              placeholder="De"
+              value={diasSemContatoMin ?? ''}
+              class="mt-0 w-full min-w-0"
+            />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input
+              type="number"
+              name="dias_sem_contato_max"
+              min="0"
+              placeholder="Até"
+              value={diasSemContatoMax ?? ''}
+              class="mt-0 w-full min-w-0"
+            />
+          </div>
+        </div>
+        <div>
+          <label>Total Pedidos</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input
+              type="number"
+              name="total_pedidos_min"
+              min="0"
+              placeholder="De"
+              value={totalPedidosMin ?? ''}
+              class="mt-0 w-full min-w-0"
+            />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input
+              type="number"
+              name="total_pedidos_max"
+              min="0"
+              placeholder="Até"
+              value={totalPedidosMax ?? ''}
+              class="mt-0 w-full min-w-0"
+            />
+          </div>
+        </div>
+        <div>
+          <label>Receita Total (R$)</label>
+          <div class="mt-1 flex items-center gap-2">
+            <input
+              type="number"
+              name="receita_min"
+              min="0"
+              step="0.01"
+              placeholder="De"
+              value={receitaMinTexto}
+              class="mt-0 w-full min-w-0"
+            />
+            <span class="shrink-0 text-slate-500">–</span>
+            <input
+              type="number"
+              name="receita_max"
+              min="0"
+              step="0.01"
+              placeholder="Até"
+              value={receitaMaxTexto}
+              class="mt-0 w-full min-w-0"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a href="/clientes" class="btn-secondary">Limpar filtros</a>
+      </div>
+    </form>
+  </FiltrosCard>
 
   <div class="card overflow-x-auto max-h-[70vh] overflow-y-auto pt-0">
     <table>
@@ -148,7 +356,9 @@ const clientes = await listClientesStatus();
         }
         {clientes.length === 0 && (
           <tr>
-            <td colspan="9" class="text-center text-slate-400">Nenhum cliente cadastrado ainda.</td>
+            <td colspan="9" class="text-center text-slate-400">
+              {filtrosAtivos > 0 ? 'Nenhum cliente encontrado para esses filtros.' : 'Nenhum cliente cadastrado ainda.'}
+            </td>
           </tr>
         )}
       </tbody>

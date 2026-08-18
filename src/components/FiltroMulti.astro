@@ -1,0 +1,105 @@
+---
+/**
+ * Multi-seleção de filtro: um <details> com lista de checkboxes no lugar de um
+ * <select>, para o filtro aceitar vários valores ao mesmo tempo (ex.: Cliente
+ * = "Agência Papoca" + "Abul", Status = "Ativo" + "Em Risco").
+ *
+ * Todos os checkboxes compartilham o mesmo `name`, então o GET do formulário
+ * sai como `?cliente_id=3&cliente_id=7` e a página lê com
+ * `searchParams.getAll(name)` — mesmo formato que o filtro de Status de
+ * /pedidos já usa, só com a apresentação recolhida porque uma lista de dezenas
+ * de clientes não cabe aberta como aquelas quatro opções cabem.
+ *
+ * `buscavel` liga o campo de busca (filtra as opções no cliente, sem recarregar
+ * a página); use em listas longas. O resumo do <summary> é calculado aqui no
+ * servidor e atualizado por JS a cada clique — sem JS o filtro continua
+ * funcionando, só não reflete a contagem antes do submit.
+ */
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  name: string;
+  label: string;
+  options: Option[];
+  selecionados?: string[];
+  buscavel?: boolean;
+  rotuloVazio?: string;
+}
+
+const { name, label, options, selecionados = [], buscavel = false, rotuloVazio = 'Todos' } = Astro.props;
+
+const marcados = options.filter((o) => selecionados.includes(o.value));
+const resumo =
+  marcados.length === 0
+    ? rotuloVazio
+    : marcados.length === 1
+      ? marcados[0].label
+      : `${marcados.length} selecionados`;
+---
+
+<div data-filtro-multi data-rotulo-vazio={rotuloVazio}>
+  <span class="block text-sm font-medium text-slate-700">{label}</span>
+  <details class="relative mt-1">
+    <summary
+      class="flex cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-700 shadow-sm [&::-webkit-details-marker]:hidden"
+    >
+      <span class="min-w-0 truncate" data-resumo>{resumo}</span>
+      <span class="shrink-0 text-slate-400">▾</span>
+    </summary>
+    <div class="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-300 bg-slate-100 p-2 shadow-lg">
+      {
+        buscavel && (
+          <input type="search" placeholder="Buscar…" aria-label={`Buscar em ${label}`} data-busca class="!mt-0 mb-2" />
+        )
+      }
+      <div class="flex flex-col gap-1">
+        {
+          options.map((o) => (
+            // O <label> vive dentro de um <div data-opcao> só para a busca poder
+            // esconder a opção com o atributo `hidden`: no <label> não daria, o
+            // `!flex` que ele precisa (o base style do projeto deixa label como
+            // `block`) é !important e venceria o display:none do `hidden`.
+            <div data-opcao data-rotulo={o.label.toLowerCase()}>
+              <label class="!flex items-center gap-2 !text-sm !font-normal text-slate-600">
+                <input type="checkbox" name={name} value={o.value} checked={selecionados.includes(o.value)} class="!mt-0 !w-auto" />
+                <span class="min-w-0 truncate" title={o.label}>
+                  {o.label}
+                </span>
+              </label>
+            </div>
+          ))
+        }
+        {options.length === 0 && <span class="px-1 text-sm text-slate-400">Nada para filtrar</span>}
+      </div>
+    </div>
+  </details>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-filtro-multi]').forEach((raiz) => {
+    const resumo = raiz.querySelector<HTMLElement>('[data-resumo]');
+    const vazio = raiz.dataset.rotuloVazio || 'Todos';
+
+    raiz.addEventListener('change', () => {
+      if (!resumo) return;
+      const marcados = Array.from(raiz.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).filter(
+        (c) => c.checked
+      );
+      if (marcados.length === 0) resumo.textContent = vazio;
+      else if (marcados.length === 1)
+        resumo.textContent = marcados[0].closest<HTMLElement>('[data-opcao]')?.textContent?.trim() ?? '1 selecionado';
+      else resumo.textContent = `${marcados.length} selecionados`;
+    });
+
+    const busca = raiz.querySelector<HTMLInputElement>('[data-busca]');
+    busca?.addEventListener('input', () => {
+      const termo = busca.value.trim().toLowerCase();
+      raiz.querySelectorAll<HTMLElement>('[data-opcao]').forEach((opcao) => {
+        opcao.hidden = termo !== '' && !(opcao.dataset.rotulo ?? '').includes(termo);
+      });
+    });
+  });
+</script>
