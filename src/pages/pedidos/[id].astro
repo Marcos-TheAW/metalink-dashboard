@@ -9,6 +9,7 @@ import { CANAIS, STATUS_PEDIDO } from '../../lib/types';
 const usuario = Astro.locals.usuario;
 const id = Number(Astro.params.id);
 const erro = Astro.url.searchParams.get('erro');
+const sucesso = Astro.url.searchParams.get('sucesso');
 
 const pedido = Number.isFinite(id) ? await getPedido(id) : null;
 
@@ -33,6 +34,21 @@ const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome
         <h1 class="mb-6">Pedido #{pedido.id}</h1>
 
         <ErrorBanner mensagem={erro} />
+
+        {
+          (sucesso === 'criado' || sucesso === 'atualizado') && (
+            <dialog id="modal-sucesso-pedido" class="rounded-lg border border-slate-300 bg-slate-100 p-6 shadow-lg backdrop:bg-slate-900/60">
+              <p class="mb-4 text-sm text-slate-700">
+                {sucesso === 'criado' ? 'Pedido criado com sucesso!' : 'Pedido atualizado com sucesso!'}
+              </p>
+              <div class="flex flex-wrap gap-3">
+                <a href="/pedidos/novo" class="btn-primary">Criar um novo pedido</a>
+                <button type="button" data-fechar-modal-sucesso class="btn-secondary">Continuar no pedido atual</button>
+                <a href="/pedidos" class="btn-secondary">Ir para o Dashboard de Pedidos</a>
+              </div>
+            </dialog>
+          )
+        }
 
         <form method="post" action={`/api/pedidos/${pedido.id}`} class="card grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormSelect name="cliente_id" label="Cliente" options={opcoesClientes} value={String(pedido.cliente_id)} required />
@@ -120,3 +136,12 @@ const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome
     )
   }
 </Layout>
+
+<script>
+  const modal = document.getElementById('modal-sucesso-pedido') as HTMLDialogElement | null;
+  if (modal) {
+    modal.showModal();
+    history.replaceState(null, '', location.pathname);
+    modal.querySelector('[data-fechar-modal-sucesso]')?.addEventListener('click', () => modal.close());
+  }
+</script>

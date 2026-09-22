@@ -82,6 +82,7 @@ const filtrosAtivos = [tipo, resultado, canal, clienteIdRaw].filter(Boolean).len
           <th>Tipo de Ação</th>
           <th>Resultado</th>
           <th>Observações</th>
+          <th>Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -100,12 +101,17 @@ const filtrosAtivos = [tipo, resultado, canal, clienteIdRaw].filter(Boolean).len
                 <StatusBadge value={a.resultado} label={labelFor(RESULTADOS_ACAO, a.resultado)} />
               </td>
               <td>{a.observacoes ?? '—'}</td>
+              <td>
+                <a href={`/comercial/${a.id}`} class="text-brand-600 hover:underline">
+                  Editar
+                </a>
+              </td>
             </tr>
           ))
         }
         {acoes.length === 0 && (
           <tr>
-            <td colspan="6" class="text-center text-slate-400">Nenhuma ação encontrada para esses filtros.</td>
+            <td colspan="7" class="text-center text-slate-400">Nenhuma ação encontrada para esses filtros.</td>
           </tr>
         )}
       </tbody>

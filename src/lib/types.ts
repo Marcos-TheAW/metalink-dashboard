@@ -1,6 +1,6 @@
 export type Papel = 'admin' | 'colaborador';
 
-export type Canal = 'presswhizz' | 'white_press' | 'cliente_direto_br' | 'cliente_direto_intl';
+export type Canal = 'plataforma' | 'cliente_direto_br' | 'cliente_direto_intl';
 
 export type StatusPedido =
   | 'aguardando_producao'
@@ -31,8 +31,7 @@ export type ResultadoAcao =
 export type StatusRelacionamento = 'ativo' | 'em_risco' | 'perdido' | 'nunca_comprou';
 
 export const CANAIS: { value: Canal; label: string }[] = [
-  { value: 'presswhizz', label: 'PressWhizz' },
-  { value: 'white_press', label: 'White Press' },
+  { value: 'plataforma', label: 'Plataforma' },
   { value: 'cliente_direto_br', label: 'Cliente Direto BR' },
   { value: 'cliente_direto_intl', label: 'Cliente Direto Internacional' }
 ];

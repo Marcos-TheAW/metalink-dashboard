@@ -66,5 +66,5 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
     locals.usuario.id
   );
 
-  return redirect(`/pedidos/${id}`);
+  return redirect(`/pedidos/${id}?sucesso=atualizado`);
 };
