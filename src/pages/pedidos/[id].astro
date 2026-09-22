@@ -37,7 +37,10 @@ const opcoesUsuarios = usuarios.map((u) => ({ value: String(u.id), label: u.nome
 
         {
           (sucesso === 'criado' || sucesso === 'atualizado') && (
-            <dialog id="modal-sucesso-pedido" class="rounded-lg border border-slate-300 bg-slate-100 p-6 shadow-lg backdrop:bg-slate-900/60">
+            <dialog
+              id="modal-sucesso-pedido"
+              class="fixed top-1/2 left-1/2 m-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-slate-300 bg-slate-100 p-6 shadow-lg backdrop:bg-slate-50/50"
+            >
               <p class="mb-4 text-sm text-slate-700">
                 {sucesso === 'criado' ? 'Pedido criado com sucesso!' : 'Pedido atualizado com sucesso!'}
               </p>
