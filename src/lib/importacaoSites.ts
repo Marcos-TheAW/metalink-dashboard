@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { db } from './db';
+import { atualizarSiteProspectado, db, getSiteProspectado } from './db';
 import {
   CANAIS_PROSPECCAO,
   OPCOES_SIM_NAO,
@@ -34,6 +34,11 @@ export const CABECALHO_MODELO = [
   'Dentro da tabela de preços?',
   'Observações'
 ];
+
+// Mesmas colunas do modelo de criação, com a coluna "ID" na frente — usada tanto para
+// exportar a planilha de atualização em massa (já preenchida com os dados atuais) quanto
+// para validar o cabeçalho na hora de processar o upload de volta.
+export const CABECALHO_ATUALIZACAO = ['ID', ...CABECALHO_MODELO];
 
 function normalizarChaves(linha: Linha): Linha {
   const normalizada: Linha = {};
@@ -240,4 +245,118 @@ export async function processarImportacaoSitesXlsx(
   await executarEmLotes(statements);
 
   return { inseridos: statements.length, ignorados };
+}
+
+export interface ResultadoAtualizacaoSites {
+  atualizados: number;
+  ignorados: LinhaIgnoradaSite[];
+}
+
+// Atualização em massa por ID: a planilha vem da própria exportação "Sites — atualização"
+// (coluna ID + dados atuais já preenchidos), então cada linha é tratada como uma substituição
+// completa do registro, igual a editar o site manualmente pelo formulário — reaproveita
+// `atualizarSiteProspectado`, que já grava o histórico de alterações campo a campo.
+// `responsavel_id` fica de fora do modelo (assim como na criação em massa) e por isso é
+// sempre preservado do valor atual, nunca zerado por a coluna não existir na planilha.
+// `num_tentativas` cai no mesmo caso quando a célula vem vazia: mantém o valor atual em vez
+// do default "1" usado na criação, pra não resetar a contagem de tentativas por acidente.
+export async function processarAtualizacaoSitesXlsx(
+  buffer: ArrayBuffer,
+  usuarioId: number
+): Promise<ResultadoAtualizacaoSites> {
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const planilha = encontrarPlanilha(workbook);
+  if (!planilha) {
+    throw new Error('Não encontrei nenhuma aba no arquivo enviado.');
+  }
+
+  const linhas = XLSX.utils.sheet_to_json<Linha>(planilha, { raw: false, defval: '' }).map(normalizarChaves);
+
+  const ignorados: LinhaIgnoradaSite[] = [];
+  let atualizados = 0;
+
+  for (let indice = 0; indice < linhas.length; indice++) {
+    const linha = linhas[indice];
+    const numeroLinha = indice + 2; // +1 pelo cabeçalho, +1 por índice base 1
+    const idTexto = (linha['ID'] ?? '').trim();
+    if (!idTexto) continue; // linha em branco no fim do arquivo — não é um erro, só ignora silenciosamente
+
+    const id = Number(idTexto);
+    if (!Number.isFinite(id)) {
+      ignorados.push({ linha: numeroLinha, motivo: `ID inválido: "${idTexto}".` });
+      continue;
+    }
+
+    const atual = await getSiteProspectado(id);
+    if (!atual) {
+      ignorados.push({ linha: numeroLinha, motivo: `Site #${id} não encontrado.` });
+      continue;
+    }
+
+    const urlSite = (linha['URL do Site'] ?? '').trim();
+    const canal = labelParaValor(CANAIS_PROSPECCAO, linha['Canal Utilizado'] ?? '');
+    const tipoContato = labelParaValor(TIPOS_CONTATO_PROSPECCAO, linha['Tipo de Contato'] ?? '');
+    const status = labelParaValor(STATUS_PROSPECCAO, linha['Status Atual'] ?? '');
+    const dataContatoTexto = (linha['Data do Contato (segunda-feira da semana)'] ?? '').trim();
+
+    if (!urlSite) {
+      ignorados.push({ linha: numeroLinha, motivo: 'URL do Site vazia.' });
+      continue;
+    }
+    if (!canal) {
+      ignorados.push({ linha: numeroLinha, motivo: `Canal Utilizado inválido: "${linha['Canal Utilizado'] ?? ''}".` });
+      continue;
+    }
+    if (!tipoContato) {
+      ignorados.push({ linha: numeroLinha, motivo: `Tipo de Contato inválido: "${linha['Tipo de Contato'] ?? ''}".` });
+      continue;
+    }
+    if (!status) {
+      ignorados.push({ linha: numeroLinha, motivo: `Status Atual inválido: "${linha['Status Atual'] ?? ''}".` });
+      continue;
+    }
+    if (!dataContatoTexto) {
+      ignorados.push({ linha: numeroLinha, motivo: 'Data do Contato vazia.' });
+      continue;
+    }
+
+    const dataContatoParsed = parseData(dataContatoTexto);
+    if (!dataContatoParsed) {
+      ignorados.push({ linha: numeroLinha, motivo: `Data do Contato inválida: "${dataContatoTexto}".` });
+      continue;
+    }
+    const dataContato = segundaFeiraDaSemana(dataContatoParsed);
+
+    await atualizarSiteProspectado(
+      id,
+      {
+        url_site: urlSite,
+        domain_rating: inteiroOuNull(linha['DR']),
+        trafego_estimado: limparTrafego(linha['Tráfego Estimado']),
+        nicho: textoOuNull(linha['Nicho / Segmento']),
+        canal,
+        tipo_contato: tipoContato,
+        status,
+        num_tentativas: inteiroOuNull(linha['Nº de Tentativas']) ?? atual.num_tentativas,
+        data_contato: dataContato,
+        link_email: textoOuNull(linha['Link do E-mail']),
+        valor_solicitado_white_centavos: dinheiroOuNull(linha['Valor Solicitado – White Hat (R$)']),
+        valor_solicitado_black_centavos: dinheiroOuNull(linha['Valor Solicitado – Black Hat (R$)']),
+        valor_fechado_white_centavos: dinheiroOuNull(linha['Valor Fechado – White Hat (R$)']),
+        valor_fechado_black_centavos: dinheiroOuNull(linha['Valor Fechado – Black Hat (R$)']),
+        valor_fechado_insercao_centavos: dinheiroOuNull(linha['Valor Fechado – Inserção (R$)']),
+        aceita_insercao: enumOuNull(OPCOES_TRI_ESTADO, linha['Aceita Inserção?']),
+        aceita_pacote: enumOuNull(OPCOES_TRI_ESTADO, linha['Aceita Pacote?']),
+        administra_outros_sites: enumOuNull(OPCOES_TRI_ESTADO, linha['Adm. Outros Sites?']),
+        outros_sites_urls: textoOuNull(linha['Outros Sites (URLs)']),
+        dentro_tabela_precos: enumOuNull(OPCOES_SIM_NAO, linha['Dentro da tabela de preços?']),
+        observacoes: textoOuNull(linha['Observações']),
+        responsavel_id: atual.responsavel_id
+      },
+      usuarioId
+    );
+    atualizados++;
+  }
+
+  return { atualizados, ignorados };
 }

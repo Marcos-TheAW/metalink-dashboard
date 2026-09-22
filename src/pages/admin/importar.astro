@@ -1,12 +1,19 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import {
+  processarAtualizacaoPedidosXlsx,
   processarImportacaoAcoesXlsx,
   processarImportacaoPedidosXlsx,
+  type ResultadoAtualizacaoPedidos,
   type ResultadoImportacaoAcoes,
   type ResultadoImportacaoPedidos
 } from '../../lib/importacao';
-import { processarImportacaoSitesXlsx, type ResultadoImportacaoSites } from '../../lib/importacaoSites';
+import {
+  processarAtualizacaoSitesXlsx,
+  processarImportacaoSitesXlsx,
+  type ResultadoAtualizacaoSites,
+  type ResultadoImportacaoSites
+} from '../../lib/importacaoSites';
 
 const usuario = Astro.locals.usuario;
 
@@ -21,6 +28,10 @@ let resultadoPedidos: ResultadoImportacaoPedidos | null = null;
 let erroPedidos: string | null = null;
 let resultadoAcoes: ResultadoImportacaoAcoes | null = null;
 let erroAcoes: string | null = null;
+let resultadoAtualizacaoPedidos: ResultadoAtualizacaoPedidos | null = null;
+let erroAtualizacaoPedidos: string | null = null;
+let resultadoAtualizacaoSites: ResultadoAtualizacaoSites | null = null;
+let erroAtualizacaoSites: string | null = null;
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
@@ -61,6 +72,30 @@ if (Astro.request.method === 'POST') {
       }
     } catch (e) {
       erroAcoes = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
+    }
+  } else if (tipo === 'pedidos_atualizar') {
+    try {
+      const arquivo = form.get('arquivo_pedidos_atualizar');
+      if (!(arquivo instanceof File) || arquivo.size === 0) {
+        erroAtualizacaoPedidos = 'Selecione um arquivo .xlsx antes de enviar.';
+      } else {
+        const buffer = await arquivo.arrayBuffer();
+        resultadoAtualizacaoPedidos = await processarAtualizacaoPedidosXlsx(buffer, usuario.id);
+      }
+    } catch (e) {
+      erroAtualizacaoPedidos = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
+    }
+  } else if (tipo === 'sites_atualizar') {
+    try {
+      const arquivo = form.get('arquivo_sites_atualizar');
+      if (!(arquivo instanceof File) || arquivo.size === 0) {
+        erroAtualizacaoSites = 'Selecione um arquivo .xlsx antes de enviar.';
+      } else {
+        const buffer = await arquivo.arrayBuffer();
+        resultadoAtualizacaoSites = await processarAtualizacaoSitesXlsx(buffer, usuario.id);
+      }
+    } catch (e) {
+      erroAtualizacaoSites = e instanceof Error ? e.message : 'Falha ao processar o arquivo.';
     }
   }
 }
@@ -125,6 +160,67 @@ if (Astro.request.method === 'POST') {
           </div>
         )
       }
+
+      <hr class="my-6 border-slate-300" />
+
+      <h2>Atualizar em massa (por ID)</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Baixe a planilha com os sites já cadastrados (inclui a coluna <strong>ID</strong>), edite
+        os campos que quiser no Excel/Sheets e faça o upload de volta — cada linha atualiza o site
+        com aquele ID. Não apague a coluna ID nem altere os valores dela. A linha inteira é
+        substituída pelo que estiver na planilha, então não deixe células em branco que você queira
+        manter preenchidas.
+      </p>
+      <a href="/api/admin/prospeccao/sites/exportar-atualizacao" class="btn-secondary mt-3 inline-flex">
+        Baixar planilha atual (com ID)
+      </a>
+
+      <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <input type="hidden" name="tipo" value="sites_atualizar" />
+        <div class="flex-1">
+          <label for="arquivo_sites_atualizar">Arquivo .xlsx</label>
+          <input type="file" id="arquivo_sites_atualizar" name="arquivo_sites_atualizar" accept=".xlsx" required />
+        </div>
+        <button type="submit" class="btn-primary">Atualizar sites</button>
+      </form>
+
+      {
+        erroAtualizacaoSites && (
+          <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {erroAtualizacaoSites}
+          </div>
+        )
+      }
+
+      {
+        resultadoAtualizacaoSites && (
+          <div class="mt-4 flex flex-col gap-4">
+            <div class="rounded-md border border-brand-500 bg-brand-500/10 px-4 py-3 text-sm text-white">
+              <strong>{resultadoAtualizacaoSites.atualizados}</strong> site(s) atualizado(s), {resultadoAtualizacaoSites.ignorados.length} linha(s) ignorada(s).
+            </div>
+            {resultadoAtualizacaoSites.ignorados.length > 0 && (
+              <div class="overflow-x-auto">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Linha no arquivo</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultadoAtualizacaoSites.ignorados.map((item) => (
+                      <tr>
+                        <td>{item.linha}</td>
+                        <td>{item.motivo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      }
     </section>
 
     <section class="card max-w-2xl">
@@ -171,6 +267,67 @@ if (Astro.request.method === 'POST') {
                   </thead>
                   <tbody>
                     {resultadoPedidos.ignorados.map((item) => (
+                      <tr>
+                        <td>{item.linha}</td>
+                        <td>{item.motivo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      <hr class="my-6 border-slate-300" />
+
+      <h2>Atualizar em massa (por ID)</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Baixe a planilha com os pedidos já cadastrados (inclui a coluna <strong>ID</strong>), edite
+        os campos que quiser no Excel/Sheets e faça o upload de volta — cada linha atualiza o
+        pedido com aquele ID. Não apague a coluna ID nem altere os valores dela. A linha inteira é
+        substituída pelo que estiver na planilha, então não deixe células em branco que você queira
+        manter preenchidas.
+      </p>
+      <a href="/api/admin/pedidos/exportar-atualizacao" class="btn-secondary mt-3 inline-flex">
+        Baixar planilha atual (com ID)
+      </a>
+
+      <form method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <input type="hidden" name="tipo" value="pedidos_atualizar" />
+        <div class="flex-1">
+          <label for="arquivo_pedidos_atualizar">Arquivo .xlsx</label>
+          <input type="file" id="arquivo_pedidos_atualizar" name="arquivo_pedidos_atualizar" accept=".xlsx" required />
+        </div>
+        <button type="submit" class="btn-primary">Atualizar pedidos</button>
+      </form>
+
+      {
+        erroAtualizacaoPedidos && (
+          <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {erroAtualizacaoPedidos}
+          </div>
+        )
+      }
+
+      {
+        resultadoAtualizacaoPedidos && (
+          <div class="mt-4 flex flex-col gap-4">
+            <div class="rounded-md border border-brand-500 bg-brand-500/10 px-4 py-3 text-sm text-white">
+              <strong>{resultadoAtualizacaoPedidos.atualizados}</strong> pedido(s) atualizado(s), {resultadoAtualizacaoPedidos.ignorados.length} linha(s) ignorada(s).
+            </div>
+            {resultadoAtualizacaoPedidos.ignorados.length > 0 && (
+              <div class="overflow-x-auto">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Linha no arquivo</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultadoAtualizacaoPedidos.ignorados.map((item) => (
                       <tr>
                         <td>{item.linha}</td>
                         <td>{item.motivo}</td>

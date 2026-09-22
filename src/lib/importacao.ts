@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { db } from './db';
+import { atualizarPedido, db, getPedido } from './db';
 import { CANAIS, CANAIS_COMERCIAIS, RESULTADOS_ACAO, STATUS_PEDIDO, TIPOS_ACAO } from './types';
 
 type Linha = Record<string, string>;
@@ -18,6 +18,11 @@ export const CABECALHO_MODELO_PEDIDOS = [
 ];
 
 export const CABECALHO_MODELO_ACOES = ['Semana (segunda)', 'Cliente / Prospect', 'Canal', 'Tipo de Ação', 'Resultado', 'Observações'];
+
+// Mesmas colunas do modelo de criação de Pedidos, com a coluna "ID" na frente — usada tanto
+// para exportar a planilha de atualização em massa (já preenchida com os dados atuais) quanto
+// para validar o cabeçalho na hora de processar o upload de volta.
+export const CABECALHO_ATUALIZACAO_PEDIDOS = ['ID', ...CABECALHO_MODELO_PEDIDOS];
 
 function labelParaValor(lista: { value: string; label: string }[], texto: string): string | null {
   const alvo = texto.trim().toLowerCase();
@@ -193,6 +198,111 @@ export async function processarImportacaoPedidosXlsx(
   await executarEmLotes(statements);
 
   return { inseridos: statements.length, ignorados };
+}
+
+export interface ResultadoAtualizacaoPedidos {
+  atualizados: number;
+  ignorados: LinhaIgnorada[];
+}
+
+// Atualização em massa por ID: a planilha vem da própria exportação "Pedidos —
+// atualização" (coluna ID + dados atuais já preenchidos), então cada linha é tratada como
+// uma substituição completa do registro, igual a editar o pedido manualmente pelo formulário
+// — reaproveita `atualizarPedido`, que já grava o histórico de alterações campo a campo.
+// `responsavel_id` fica de fora do modelo (assim como na criação em massa) e por isso é
+// sempre preservado do valor atual, nunca zerado por a coluna não existir na planilha.
+export async function processarAtualizacaoPedidosXlsx(
+  buffer: ArrayBuffer,
+  usuarioId: number
+): Promise<ResultadoAtualizacaoPedidos> {
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const planilha = encontrarPlanilha(workbook, ['Pedidos']);
+  if (!planilha) {
+    throw new Error('Não encontrei nenhuma aba no arquivo enviado.');
+  }
+  const linhas = lerLinhas(planilha);
+
+  const nomesClientes = new Set<string>();
+  for (const linha of linhas) {
+    const nome = (linha['Cliente'] ?? '').trim();
+    if (nome) nomesClientes.add(nome);
+  }
+  const mapaClientes = await garantirClientes(nomesClientes);
+
+  const ignorados: LinhaIgnorada[] = [];
+  let atualizados = 0;
+
+  for (let indice = 0; indice < linhas.length; indice++) {
+    const linha = linhas[indice];
+    const numeroLinha = indice + 2; // +1 pelo cabeçalho, +1 por índice base 1
+    const idTexto = (linha['ID'] ?? '').trim();
+    if (!idTexto) continue; // linha em branco no fim do arquivo — não é um erro, só ignora silenciosamente
+
+    const id = Number(idTexto);
+    if (!Number.isFinite(id)) {
+      ignorados.push({ linha: numeroLinha, motivo: `ID inválido: "${idTexto}".` });
+      continue;
+    }
+
+    const atual = await getPedido(id);
+    if (!atual) {
+      ignorados.push({ linha: numeroLinha, motivo: `Pedido #${id} não encontrado.` });
+      continue;
+    }
+
+    const nomeCliente = (linha['Cliente'] ?? '').trim();
+    const clienteId = nomeCliente ? mapaClientes.get(nomeCliente) : atual.cliente_id;
+    const canal = labelParaValor(CANAIS, linha['Canal de Origem'] ?? '');
+    const status = labelParaValor(STATUS_PEDIDO, linha['Status do Pedido'] ?? '');
+    const dataPedido = parseData(linha['Data do Pedido'] ?? '');
+    const valorCentavos = parseValorReais(linha['Valor Total (R$)'] ?? '');
+
+    if (nomeCliente && !clienteId) {
+      ignorados.push({ linha: numeroLinha, motivo: `Cliente "${nomeCliente}" não encontrado.` });
+      continue;
+    }
+    if (!canal) {
+      ignorados.push({ linha: numeroLinha, motivo: `Canal de Origem inválido: "${linha['Canal de Origem'] ?? ''}".` });
+      continue;
+    }
+    if (!status) {
+      ignorados.push({ linha: numeroLinha, motivo: `Status do Pedido inválido: "${linha['Status do Pedido'] ?? ''}".` });
+      continue;
+    }
+    if (!dataPedido) {
+      ignorados.push({ linha: numeroLinha, motivo: `Data do Pedido inválida: "${linha['Data do Pedido'] ?? ''}".` });
+      continue;
+    }
+    if (valorCentavos === null || valorCentavos <= 0) {
+      ignorados.push({ linha: numeroLinha, motivo: `Valor Total inválido: "${linha['Valor Total (R$)'] ?? ''}".` });
+      continue;
+    }
+
+    const qtdLinks = parseInt(linha['Qtd. de Links'] || '1', 10) || 1;
+    const prazoEntrega = parseData(linha['Prazo de Entrega'] ?? '');
+    const linkDetalhe = (linha['Link da Planilha de Detalhe'] ?? '').trim() || null;
+    const observacao = (linha['Observação'] ?? '').trim() || null;
+
+    await atualizarPedido(
+      id,
+      {
+        cliente_id: clienteId as number,
+        canal,
+        qtd_links: qtdLinks,
+        valor_centavos: valorCentavos,
+        data_pedido: dataPedido,
+        prazo_entrega: prazoEntrega,
+        status,
+        link_detalhe: linkDetalhe,
+        observacao,
+        responsavel_id: atual.responsavel_id
+      },
+      usuarioId
+    );
+    atualizados++;
+  }
+
+  return { atualizados, ignorados };
 }
 
 export async function processarImportacaoAcoesXlsx(
